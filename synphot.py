@@ -14,13 +14,15 @@ import utils
 
 def plot_bandpasses_vega(fig, ax, filter_names):
     # Load new horizon's MVIC bandpass data
-    new_horizons_bandpasses = [utils.get_nh_bandpass(x) for x in filter_names]
+    bandpasses = [utils.get_bandpass(x) for x in filter_names]
 
     # Load vega spectrum
     vega = S.Vega
 
+    # TODO: Need to normalize
+
     # Plot observations
-    for bandpass in new_horizons_bandpasses:
+    for bandpass in bandpasses:
         # Do a synthetic observation
         observation = S.Observation(vega, bandpass)
 
@@ -40,7 +42,7 @@ def plot_bandpasses_vega(fig, ax, filter_names):
         )
 
         # Print countrates
-        print(f"{bandpass.name}: {observation.effstim()}")
+        print(f"Countrate:{bandpass.name}, {observation.effstim()}")
 
 
 if __name__ == '__main__':
@@ -49,7 +51,15 @@ if __name__ == '__main__':
 
     # Plot the sample observation
     fig, ax = plt.subplots()
-    plot_bandpasses_vega(fig, ax, ["RED", "BLUE", "NIR", "CH4", "PAN_1"])
+    bandpasses = [
+        'NH_RED',
+        'NH_BLUE',
+        # 'JOHNSON_R',
+        # 'JOHNSON_B',
+        'HST_F435W',
+        'HST_F555W',
+    ]
+    plot_bandpasses_vega(fig, ax, bandpasses)
 
     # Plot the source spectrum
     ax.plot(
