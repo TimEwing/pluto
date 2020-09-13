@@ -4,14 +4,21 @@ import glob
 import csv
 # third party imports
 import numpy as np
-os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") # set pysyn env if not set
-import pysynphot as S # Importing it as S bad style for python but used by the docs
 from astropy.io import fits
+# pysynphot
+os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") # set pysyn env if not set
+import pysynphot as S # Importing it as S bad style for python, but used by the docs
+# Normalize Vega to HST: https://arxiv.org/pdf/1403.6861.pdf
+
+
 
 # Constants
 NH_FILTER_DIR = 'data/nh_filters'
 HST_FILTER_DIR = 'data/hst_filters'
 CHARON_SPECTRUM = 'data/spectra/charon_spectrum.dat'
+VEGAFILE = 'data/vega_spectrum.fits'
+
+
 
 
 COLORMAP = {
@@ -29,6 +36,7 @@ COLORMAP = {
     'HST_F555W': 'orange',
     'HST_F435W': 'cyan',
 }
+
 
 def get_bandpass(filter_name):
     # Be case insensitive

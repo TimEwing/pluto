@@ -5,19 +5,17 @@ import os
 # third party imports
 import matplotlib.pyplot as plt
 import numpy as np
-os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") # set pysyn env if not set
-import pysynphot as S # Importing it as S bad style for python, but used by the docs
 from astropy.io import fits
 
 # custom module imports
+from utils import S, Vega # import pysynphot and Vega from utils since they needs some setup
 import utils
 
-def plot_bandpasses_vega(fig, ax, filter_names):
+
+
+def plot_spectra(fig, ax, spectrum, filter_names):
     # Load new horizon's MVIC bandpass data
     bandpasses = [utils.get_bandpass(x) for x in filter_names]
-
-    # Load vega spectrum
-    vega = S.Vega
 
     # TODO: Need to normalize
 
@@ -27,9 +25,6 @@ def plot_bandpasses_vega(fig, ax, filter_names):
         observation = S.Observation(vega, bandpass)
 
         ## Convert to vegamag
-        # In Carly's paper, there's a part where flam at Pluto is converted to flam at Earth.
-        # We probably don't actually need to do that; difference is going to be something like 
-        # (Pluto's orbital radius) / (distance to Vega), which is about 2.5e-5. 
         observation.convert('vegamag')
 
         # Plot observation
@@ -41,8 +36,7 @@ def plot_bandpasses_vega(fig, ax, filter_names):
             linewidth=1,
         )
 
-        # Print countrates
-        print(f"Countrate:{bandpass.name}, {observation.effstim()}")
+def fill_between(fig, ax, filter_name_sets)
 
 
 if __name__ == '__main__':
@@ -51,6 +45,7 @@ if __name__ == '__main__':
 
     # Plot the sample observation
     fig, ax = plt.subplots()
+
     bandpasses = [
         'NH_RED',
         'NH_BLUE',
@@ -59,7 +54,9 @@ if __name__ == '__main__':
         'HST_F435W',
         'HST_F555W',
     ]
-    plot_bandpasses_vega(fig, ax, bandpasses)
+    vega = S.Vega
+
+    plot_spectra(fig, ax, bandpasses)
 
     # Plot the source spectrum
     ax.plot(
