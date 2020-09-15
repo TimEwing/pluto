@@ -8,40 +8,41 @@ import numpy as np
 from astropy.io import fits
 
 # custom module imports
-from utils import S, Vega # import pysynphot and Vega from utils since they needs some setup
+from utils import S # import pysynphot from utils since it needs some setup
 import utils
 
 
 
-def plot_spectra(fig, ax, spectrum, filter_names):
+def plot_spectrum(fig, ax, spectrum, filter_names):
     # Load new horizon's MVIC bandpass data
     bandpasses = [utils.get_bandpass(x) for x in filter_names]
 
-    # TODO: Need to normalize
-
     # Plot observations
     for bandpass in bandpasses:
+        spectrum.convert('angstrom')
+        bandpass.convert('angstrom')
+
         # Do a synthetic observation
-        observation = S.Observation(vega, bandpass)
+        observation = S.Observation(spectrum, bandpass)
 
         ## Convert to vegamag
         observation.convert('vegamag')
 
         # Plot observation
         ax.plot(
-            observation.binwave, 
-            observation.binflux, 
+            bandpass.wave, 
+            bandpass.throughput, 
             label=bandpass.name,
             c=utils.COLORMAP.get(bandpass.name, None), # Get colors from colormap, default to None
             linewidth=1,
         )
 
-def fill_between(fig, ax, filter_name_sets)
-
-
+# This if statement runs only if the module is called from the command line
+# If it gets imported, __name__ will not be set to '__main__'
 if __name__ == '__main__':
     # Set telescope aperture; otherwise, default for Hubble is used
     S.setref(area=176.7) # cm^2; using 75mm radius aperture from DOI: 10.1117/12.617901
+    spectrum = S.Vega
 
     # Plot the sample observation
     fig, ax = plt.subplots()
@@ -54,14 +55,13 @@ if __name__ == '__main__':
         'HST_F435W',
         'HST_F555W',
     ]
-    vega = S.Vega
 
-    plot_spectra(fig, ax, bandpasses)
+    plot_spectrum(fig, ax, spectrum, bandpasses)
 
     # Plot the source spectrum
     ax.plot(
-        S.Vega.wave, 
-        S.Vega.flux, 
+        spectrum.wave, 
+        spectrum.flux, 
         label="Vega", 
         c='black',
         linewidth=1,
@@ -70,5 +70,5 @@ if __name__ == '__main__':
     # Setup plots
     ax.legend()
     ax.set_xlim(0,11000)
-    ax.invert_yaxis() # To make vegamag units more intuitive
+    # ax.invert_yaxis() # To make vegamag units more intuitive
     plt.show()

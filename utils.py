@@ -8,8 +8,6 @@ from astropy.io import fits
 # pysynphot
 os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") # set pysyn env if not set
 import pysynphot as S # Importing it as S bad style for python, but used by the docs
-# Normalize Vega to HST: https://arxiv.org/pdf/1403.6861.pdf
-
 
 
 # Constants
@@ -17,8 +15,6 @@ NH_FILTER_DIR = 'data/nh_filters'
 HST_FILTER_DIR = 'data/hst_filters'
 CHARON_SPECTRUM = 'data/spectra/charon_spectrum.dat'
 VEGAFILE = 'data/vega_spectrum.fits'
-
-
 
 
 COLORMAP = {
@@ -56,7 +52,7 @@ def get_bandpass(filter_name):
 
 
 def get_johnson_bandpass(filter_name):
-    filter_color = filter_name.lstrip('JOHNSON_')
+    filter_color = filter_name[8:] # Strip JOHNSON_ prefix
     filter_color = filter_color.lower()
 
     bandpass = S.ObsBandpass(f'johnson,{filter_color.lower()}')
@@ -66,7 +62,7 @@ def get_johnson_bandpass(filter_name):
 
 def get_hst_bandpass(filter_name, path=HST_FILTER_DIR):
     # Search for the file; filter_name should be F435W or F555W
-    filter_color = filter_name.lstrip('HST_')
+    filter_color = filter_name[4:] # Remove HST_ prefix
     file = glob.glob(os.path.join(path, f'wfc_{filter_color}.dat'))
     # If we found anything but 1 file, raise an error
     if not file:
@@ -99,7 +95,7 @@ def get_hst_bandpass_data(file):
 
 def get_nh_bandpass(filter_name, path=NH_FILTER_DIR):
     # Search for the file; filter_name should be NH_RED, NH_BLUE, NH_NIR, etc.
-    filter_color = filter_name.lstrip('NH_')
+    filter_color = filter_name[3:] # Remove NH_ prefix
     file = glob.glob(os.path.join(path, f'{filter_color}*.FITS'))
     # If we found anything but 1 file, raise an error
     if not file:
@@ -116,7 +112,7 @@ def get_nh_bandpass(filter_name, path=NH_FILTER_DIR):
         name=filter_name,
         wave=wavelengths,
         throughput=throughputs,
-        waveunits='Angstrom',
+        waveunits='micron',
     )
     return bandpass
 
@@ -131,9 +127,7 @@ def get_nh_bandpass_data(file):
         data = data[0].data
         # Remove low values of throughput so pysynphot can check overlaps better
         data = data[data[:,1] > 10e-7]
-        # Scale data
         wavelengths, throughputs = data.transpose()
-        wavelengths = wavelengths*1e4
 
         return wavelengths, throughputs, header
 
@@ -144,9 +138,9 @@ def get_charon_spectrum():
         wave=wavelengths,
         flux=fluxes,
         name='Charon',
-        waveunits='Angstrom',
-        fluxunits='???'
+        waveunits='micron',
     )
+    return spectrum
 
 
 def get_charon_spectrum_data():
@@ -158,7 +152,5 @@ def get_charon_spectrum_data():
         )
         # Read off lines, casting everything to floats
         data = np.array([[float(x), float(y)] for x,y in reader])
-        # Scale data
         wavelengths, fluxes = data.transpose()
-        wavelengths = wavelengths*1e4
         return wavelengths, fluxes
