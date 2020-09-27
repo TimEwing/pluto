@@ -5,6 +5,7 @@ import csv
 # third party imports
 import numpy as np
 from astropy.io import fits
+from scipy.io.idl import readsav
 # pysynphot
 os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") # set pysyn env if not set
 import pysynphot as S # Importing it as S bad style for python, but used by the docs
@@ -14,7 +15,9 @@ import pysynphot as S # Importing it as S bad style for python, but used by the 
 NH_FILTER_DIR = 'data/nh_filters'
 HST_FILTER_DIR = 'data/hst_filters'
 CHARON_SPECTRUM = 'data/spectra/charon_spectrum.dat'
-VEGAFILE = 'data/vega_spectrum.fits'
+# Not used since pysynphot comes with a vega spectrum
+# VEGAFILE = 'data/vega_spectrum.fits'
+NH_OBSERVATION_FILE = 'data/quicklook8_prenewscrange.idlsave'
 
 
 COLORMAP = {
@@ -32,6 +35,45 @@ COLORMAP = {
     'HST_F555W': 'orange',
     'HST_F435W': 'cyan',
 }
+SAVE_MAP = {
+    'NH_RED': 'red_flux',
+    'NH_BLUE': 'blue_flux',
+    'NH_NIR': 'nir_flux',
+    'NH_CH4': 'ch4_flux',
+}
+
+
+def get_nh_observations(filter_name, file=NH_OBSERVATION_FILE):
+    save = readsav(file)
+
+    return transform_dict(
+        save,
+        fields=[
+            SAVE_MAP[filter_name], # red_flux, blue_flux, or similar
+            'sc_range',
+            'targ_sun',
+        ],
+        new_field_names={
+            'sc_range': 'obs_to_target',
+            'targ_sun': 'target_to_sun',
+        } # replace field names to have a consistent naming convention
+    )
+
+
+def transform_dict(input_dict, fields, new_field_names):
+    ## Given a dict and a list of fields, return a list of dicts. I.e.
+    #   inputs: input_dict={'a': [1,2,3], 'b': [4,5,6]}, fields=['a','b']
+    #   output: [{'a': 1, 'b', 4}, {'a': 2, 'b', 5}, {'a': 3, 'b', 6}]
+    # if new fields names is included, it should be a dict like {'old_field': 'new_field'}
+
+    # Zip lists together
+    zipped_lists = zip(*[input_dict[field] for field in fields]) # * operator passes lists as args
+    # Replace old field names
+    # This is hard to read, but it just replaces fields if they're in the new_field_names list
+    fields = [new_field_names[field] if field in new_field_names else field for field in fields]
+    # Convert each line of the zipped lists to a dict
+    output_list = [dict(zip(fields, line)) for line in zipped_lists]
+    return output_list
 
 
 def get_bandpass(filter_name):
