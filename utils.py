@@ -10,6 +10,8 @@ from scipy.io.idl import readsav
 os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") # set pysyn env if not set
 import pysynphot as S # Importing it as S bad style for python, but used by the docs
 
+# Set telescope aperture; otherwise, default for Hubble is used
+S.setref(area=176.7) # cm^2; using 75mm radius aperture from DOI: 10.1117/12.617901
 
 # Constants
 NH_FILTER_DIR = 'data/nh_filters'
@@ -35,28 +37,30 @@ COLORMAP = {
     'HST_F555W': 'orange',
     'HST_F435W': 'cyan',
 }
-SAVE_MAP = {
-    'NH_RED': 'red_flux',
-    'NH_BLUE': 'blue_flux',
-    'NH_NIR': 'nir_flux',
-    'NH_CH4': 'ch4_flux',
-}
 
+# single filter observations
+def get_nh_observations(target, *fields, file=NH_OBSERVATION_FILE):
+    # Sanity check
+    if target not in ['pluto', 'charon']:
+        raise ValueError(f"Unknown target {target}")
 
-def get_nh_observations(filter_name, file=NH_OBSERVATION_FILE):
     save = readsav(file)
 
     return transform_dict(
         save,
         fields=[
-            SAVE_MAP[filter_name], # red_flux, blue_flux, or similar
-            'sc_range',
+            *fields,
+            'sc_range', # Always include ranges and lon/lat
             'targ_sun',
+            f'{target}_lon',
+            f'{target}_lat',
         ],
-        new_field_names={
+        new_field_names={ # replace field names to have a consistent naming convention
             'sc_range': 'obs_to_target',
-            'targ_sun': 'target_to_sun',
-        } # replace field names to have a consistent naming convention
+            'targ_sun': 'sun_to_target',
+            f'{target}_lon': 'lon',
+            f'{target}_lat': 'lat',
+        }
     )
 
 
@@ -174,7 +178,6 @@ def get_nh_bandpass_data(file):
         return wavelengths, throughputs, header
 
 def get_charon_spectrum():
-    # No idea what the units of the spectrum are. TODO: ask Cathy
     wavelengths, fluxes = get_charon_spectrum_data()
     spectrum = S.ArraySpectrum(
         wave=wavelengths,

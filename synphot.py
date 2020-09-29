@@ -40,8 +40,6 @@ def plot_spectrum(fig, ax, spectrum, filter_names):
 # This if statement runs only if the module is called from the command line
 # If it gets imported, __name__ will not be set to '__main__'
 if __name__ == '__main__':
-    # Set telescope aperture; otherwise, default for Hubble is used
-    S.setref(area=176.7) # cm^2; using 75mm radius aperture from DOI: 10.1117/12.617901
     spectrum = S.Vega
 
     # Plot the sample observation
@@ -52,7 +50,7 @@ if __name__ == '__main__':
         'NH_BLUE',
         # 'JOHNSON_R',
         # 'JOHNSON_B',
-        'HST_F435W',
+        # 'HST_F435W',
         'HST_F555W',
     ]
 
