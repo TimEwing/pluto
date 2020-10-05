@@ -98,8 +98,8 @@ def single_convert(
         # Normalize spectrum to the observation and the distances
         spectrum = normalize_spectrum(
             spectrum=spectrum,
-            pivot_wavelength=nh_observation['pivot_wavelength'],
-            calib_flux=nh_observation['calib_flux'],
+            pivot_wavelength=nh_observation[f'{input_filter_name}_pivot_wavelength'],
+            calib_flux=nh_observation[f'{input_filter_name}_calib_flux'],
             input_obs_to_target=nh_observation['obs_to_target'],
             input_target_to_sun=nh_observation['sun_to_target'],
             output_obs_to_target=output_obs_to_target,
@@ -116,39 +116,92 @@ def single_convert(
         plot_x.append(nh_observation['obs_to_target'])
         plot_y.append(syn_observation.effstim('vegamag'))
 
-    plt.scatter(plot_x, plot_y)
-    plt.title(f"{input_filter_name} converted to {output_filter_name}")
-    plt.show()
+    plt.scatter(plot_x, plot_y, label=f"{input_filter_name}", marker='x')
 
 def multi_convert(
-        target_name
-        input_filter_names, output_filter_name
+        target_name,
+        input_filter_names, output_filter_name,
         output_obs_to_target, output_target_to_sun):
-    # get lab-calibrated data of filter throughputs
-    input_bandpasses = []
-    for input_filter_name in input_filter_names:
-        input_bandpass = utils.get_bandpass(input_filter_name)
+    # get lab-calibrated data of filter throughputs and nh observations
+    input_bandpasses = {}
+    for input_bandpass_name in input_filter_names:
+        input_bandpass = utils.get_bandpass(input_bandpass_name)
         input_bandpass.convert('Angstrom')
-        input_bandpasses.append(input_bandpass)
+        input_bandpasses[input_bandpass_name] = input_bandpass
+    # get output filter throughputs
     output_bandpass = utils.get_bandpass(output_filter_name)
     output_bandpass.convert('Angstrom')
-    # get recorded observations from new horizons
-    nh_observations = utils.get_nh_observations(target_name, input_filter_name)
+
+    # find values for weighted average of input observations
+    input_bandpass_fluxes = {}
+    for input_bandpass in input_bandpasses:
+        spectrum = utils.get_charon_spectrum()
+        # first, observe the input bandpass
+        observation = S.Observation(spectrum, input_bandpasses[input_bandpass], force='taper')
+        observation = S.Observation(observation, output_bandpass, force='taper')
+        input_bandpass_fluxes[input_bandpass] = observation.effstim('flam')
+    # normalize and find weight
+    total_flux = sum([flux for flux in input_bandpass_fluxes.values()])
+    input_bandpass_weights = {}
+    for input_bandpass, flux in input_bandpass_fluxes.items():
+        input_bandpass_weights[input_bandpass] = flux / total_flux
+
     # setup plot
     plot_x = []
     plot_y = []
 
+    # get new horizons observations
+    nh_observations = utils.get_nh_observations(target_name, *input_filter_names)
+    # convert from input filters to output filter
+    for nh_observation in nh_observations:
+        spectra = {}
+        # We need to reconstruct the target spectrum often because we often modify it
+        spectrum = utils.get_charon_spectrum()
+        spectrum.convert('Angstrom')
+        summed_wave = spectrum.wave # Just using the target spectrum to get the length right
+        summed_flux = spectrum.flux * 0 # array of 0s with the same length as the target spectrum
+        for input_bandpass_name, input_bandpass in input_bandpasses.items(): 
+            spectrum = utils.get_charon_spectrum()
+            spectrum.convert('Angstrom')
+            spectrum.convert('flam')
 
-# Simulate an observation through multiple filters
-def observe_bandpasses(spectrum, bandpasses):
-    # Observe the spectrum for the first bandpass
-    observation = S.Observation(spectrum, bandpasses[0]) 
-    # Reobserve for the rest of the bandpasses
-    for bandpass in bandpasses[1:]:
-        observation = S.Observation(observation, bandpass)
+            # Normalize spectrum to the observation and the distances
+            spectrum = normalize_spectrum(
+                spectrum=spectrum,
+                pivot_wavelength=nh_observation[f'{input_bandpass_name}_pivot_wavelength'],
+                calib_flux=nh_observation[f'{input_bandpass_name}_calib_flux'],
+                input_obs_to_target=nh_observation['obs_to_target'],
+                input_target_to_sun=nh_observation['sun_to_target'],
+                output_obs_to_target=output_obs_to_target,
+                output_target_to_sun=output_target_to_sun,
+            )
 
-    return observation
+            # Add the spectrum * the weight to the summed spectra
+            summed_flux += spectrum.flux * input_bandpass_weights[input_bandpass_name]
+            # print(input_bandpass_name, nh_observation[f'{input_bandpass_name}_calib_flux'])
 
+        spectrum = utils.get_charon_spectrum()
+        summed_spectra = S.ArraySpectrum(
+            wave=summed_wave,
+            flux=summed_flux,
+            waveunits='Angstrom',
+            fluxunits='flam',
+            name=f"{spectrum.name}_weighted",
+        )
+        # Observe normalized spectrum using output filter (usually HST or Johnson)
+        syn_observation = S.Observation(
+            summed_spectra, 
+            output_bandpass,
+            force='taper',
+        )
+
+        plot_x.append(nh_observation['obs_to_target'])
+        plot_y.append(syn_observation.effstim('vegamag'))
+    print(input_bandpass_weights)
+    plt.scatter(plot_x, plot_y, label=f"{input_filter_names}", alpha=0.5)
+
+
+# This doesn't work right now
 def filter_plots():
     # matplotlib setup
     fig, ax = plt.subplots()
@@ -227,11 +280,24 @@ def filter_plots():
 
 # This if statement runs only if the module is called from the command line
 if __name__ == '__main__':
-    single_convert(
+    filters = ['NH_RED', 'NH_BLUE', 'NH_NIR', 'NH_CH4']
+    output = 'HST_F435W'
+    for f in filters:
+        single_convert(
+            target_name='charon', 
+            input_filter_name=f,
+            output_filter_name=output, 
+            output_obs_to_target=5.760E9, # 38.5 AU in km, as corrected in the Buie paper
+            output_target_to_sun=5.909E9, # 39.5 AU in km, as corrected in the Buie paper
+        )
+    multi_convert(
         target_name='charon', 
-        input_filter_name='NH_BLUE',
-        output_filter_name='HST_F435W', 
+        input_filter_names=filters,
+        output_filter_name=output, 
         output_obs_to_target=5.760E9, # 38.5 AU in km, as corrected in the Buie paper
         output_target_to_sun=5.909E9, # 39.5 AU in km, as corrected in the Buie paper
     )
+    plt.legend()
+    plt.title(output)
+    plt.show()
     

@@ -46,7 +46,7 @@ NH_PIVOT_WAVELENGTH = {
 }
 
 # single filter observations
-def get_nh_observations(target, filter_name, file=NH_OBSERVATION_FILE):
+def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
     save = readsav(file)
 
     if target == 'pluto':
@@ -60,21 +60,27 @@ def get_nh_observations(target, filter_name, file=NH_OBSERVATION_FILE):
         'NH_CH4': 'ch4',
         'NH_NIR': 'nir',
     }
-    filter_str = filter_map[filter_name]
-
-    expected_length = len(save[f'{prefix}{filter_str}_counts'])
 
     output_dict = {
-        'counts': save[f'{prefix}{filter_str}_counts'],
-        'calib_flux': save[f'calib_{prefix}{filter_str}_flux'],
-        'exposure': save[f'{filter_str}_exptime'],
-        'pivot_wavelength': [NH_PIVOT_WAVELENGTH[filter_name]] * expected_length,
-        'p': [float(save[f'p{target}_{filter_str}'])] * expected_length,
         'obs_to_target': save['sc_range'],
         'sun_to_target': save['targ_sun'],
         'lon': save[f'{target}_lon'],
         'lat': save[f'{target}_lat'],
     }
+    # If we only have one filter_name, return keys like "counts" instead of "NH_RED_counts"
+    for filter_name in filter_names:
+        filter_str = filter_map[filter_name]
+
+        expected_length = len(save['sc_range'])
+
+        output_dict.update({
+            f'{filter_name}_counts': save[f'{prefix}{filter_str}_counts'],
+            f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'],
+            f'{filter_name}_exposure': save[f'{filter_str}_exptime'],
+            f'{filter_name}_pivot_wavelength': [NH_PIVOT_WAVELENGTH[filter_name]] * expected_length,
+            f'{filter_name}_p': [float(save[f'p{target}_{filter_str}'])] * expected_length,
+        })
+    # Return the transpose of the output_dict, i.e. a list of observations
     return transform_dict(output_dict, output_dict.keys())
 
 
