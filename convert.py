@@ -116,7 +116,7 @@ def single_convert(
         plot_x.append(nh_observation['obs_to_target'])
         plot_y.append(syn_observation.effstim('vegamag'))
 
-    plt.scatter(plot_x, plot_y, label=f"{input_filter_name}", marker='x')
+    plt.scatter(plot_x, plot_y, label=f"{input_filter_name}", marker='x', c=utils.COLORMAP[input_filter_name])
 
 def multi_convert(
         target_name,
@@ -198,16 +198,16 @@ def multi_convert(
         plot_x.append(nh_observation['obs_to_target'])
         plot_y.append(syn_observation.effstim('vegamag'))
     print(input_bandpass_weights)
-    plt.scatter(plot_x, plot_y, label=f"{input_filter_names}", alpha=0.5)
+    plt.scatter(plot_x, plot_y, label=f"{input_filter_names}", alpha=0.5, c='green')
 
 
-# This doesn't work right now
 def filter_plots():
     # matplotlib setup
     fig, ax = plt.subplots()
     ax.set_prop_cycle(linestyle=['-', '--', ':', '-.'])
 
-    bandpasses = ['NH_RED', ]
+    bandpasses = ['NH_RED', 'NH_BLUE']
+    nh_observation = utils.get_nh_observations('charon', *bandpasses)[0]
     for input_bandpass_name in bandpasses:
         input_bandpass = utils.get_bandpass(input_bandpass_name)
         input_spectrum = utils.get_charon_spectrum()
@@ -219,29 +219,23 @@ def filter_plots():
         input_bandpass.convert('Angstrom')
         output_bandpass.convert('Angstrom')
 
-        # Normalize the spectrum to match the observation
-        spectrum = normalize_spectrum_to_observation(input_spectrum, input_bandpass, input_observed_effstim)
-
-        ## Get distances
-        # Units don't matter as long as they're all the same
-        # FAKE DATA
-        input_obs_to_target_distance = 3 # AU
-        input_sun_to_target_distance = 46 # AU
-        output_obs_to_target_distance = 39.5 # AU
-        output_sun_to_target_distance = 38.5 # AU
-
-        # Normalize the spectrum with respect to the sc->pluto and pluto->earth distances
-        spectrum = normalize_spectrum_to_distance(
-            spectrum=spectrum,
-            input_obs_to_target_distance=input_obs_to_target_distance,
-            input_sun_to_target_distance=input_sun_to_target_distance,
-            output_obs_to_target_distance=output_obs_to_target_distance,
-            output_sun_to_target_distance=output_sun_to_target_distance,
+        output_obs_to_target=5.760E9, # 38.5 AU in km, as corrected in the Buie paper
+        output_target_to_sun=5.909E9, # 39.5 AU in km, as corrected in the Buie paper
+        input_spectrum = normalize_spectrum(
+            spectrum=input_spectrum,
+            pivot_wavelength=nh_observation[f'{input_bandpass_name}_pivot_wavelength'],
+            calib_flux=nh_observation[f'{input_bandpass_name}_calib_flux'],
+            input_obs_to_target=nh_observation['obs_to_target'],
+            input_target_to_sun=nh_observation['sun_to_target'],
+            output_obs_to_target=output_obs_to_target,
+            output_target_to_sun=output_target_to_sun,
         )
+
 
         # Simulate the spectrum through both bandpasses, as if you had held the input filter in front of
         # the output filter
-        observation = observe_bandpasses(spectrum, [input_bandpass, output_bandpass])
+        observation = S.Observation(input_spectrum, input_bandpass)
+        observation = S.Observation(observation, output_bandpass)
 
         # TODO: Adjust for viewing geometry
 
@@ -280,8 +274,8 @@ def filter_plots():
 
 # This if statement runs only if the module is called from the command line
 if __name__ == '__main__':
-    filters = ['NH_RED', 'NH_BLUE', 'NH_NIR', 'NH_CH4']
-    output = 'HST_F435W'
+    filters = ['NH_RED', 'NH_BLUE']
+    output = 'HST_F555W'
     for f in filters:
         single_convert(
             target_name='charon', 
