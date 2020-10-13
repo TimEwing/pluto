@@ -17,9 +17,9 @@ S.setref(area=176.7) # cm^2; using 75mm radius aperture from DOI: 10.1117/12.617
 NH_FILTER_DIR = 'data/nh_filters'
 HST_FILTER_DIR = 'data/hst_filters'
 CHARON_SPECTRUM = 'data/spectra/charon_spectrum.dat'
-# vegafile not used since pysynphot comes with a vega spectrum:
+# vegafile not used since pysynphot comes with a vega spectrum
 # VEGAFILE = 'data/vega_spectrum.fits'
-NH_OBSERVATION_FILE = 'data/quicklook8_prenewscrange.idlsave'
+NH_OBSERVATION_FILE = 'data/nh_obs.idlsave'
 
 # For plots
 COLORMAP = {
