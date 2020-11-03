@@ -1,0 +1,5 @@
+The files in this folder were modified since the column names contained spaces
+that are not easily distinguished from the column delimiters.
+
+basphot_Pluto_red.txt is in a different format than the others; the delimiter is
+the tab character.

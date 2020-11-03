@@ -17,6 +17,8 @@ S.setref(area=176.7) # cm^2; using 75mm radius aperture from DOI: 10.1117/12.617
 NH_FILTER_DIR = 'data/nh_filters'
 HST_FILTER_DIR = 'data/hst_filters'
 CHARON_SPECTRUM = 'data/spectra/charon_spectrum.dat'
+PLUTO_SPECTRUM = 'data/spectra/pluto_spectrum.dat'
+HD_SPECTRUM = 'data/hd205905_spectrum_withheader.txt'
 # vegafile not used since pysynphot comes with a vega spectrum
 # VEGAFILE = 'data/vega_spectrum.fits'
 NH_OBSERVATION_FILE = 'data/nh_obs.idlsave'
@@ -38,14 +40,55 @@ COLORMAP = {
     'HST_F435W': 'cyan',
 }
 
-NH_PIVOT_WAVELENGTH = {
+NH_PIVOT_WAVELENGTH = { # in Angstroms
     'NH_BLUE': 4920.00,
     'NH_RED': 6240.00,
     'NH_NIR': 8610.00,
     'NH_CH4': 8830.00,
 }
 
-# single filter observations
+
+def get_observations(target, *filter_names):
+    if target == 'hd':
+        return get_hd_observations(*filter_names)
+    if target == 'charon' or target == 'pluto':
+        return get_nh_observations(target, *filter_names)
+
+def get_hd_observations(*filter_names):
+
+    output_dict = {
+        'obs_to_target': 1,
+        'sun_to_target': 1,
+    }
+
+    filter_map = {
+        'NH_RED': 'red',
+        'NH_BLUE': 'blue',
+        'NH_CH4': 'ch4',
+        'NH_NIR': 'nir',
+    }
+
+    gain = 58.5 # e-/count
+    exposure_time = 1.10784 # seconds, from mc0_0330933531_0x536_sci_2.fit
+
+    data_map = {
+        "blue": 188.6,
+        "red": 527.8,
+        "nir": 347.5,
+        "ch4": 97.0,
+    }
+
+    for filter_name in filter_names:
+        filter_str = filter_map[filter_name]
+
+        output_dict.update({
+            f'{filter_name}_counts': data_map[filter_str],
+            f'{filter_name}_calib_flux': data_map[filter_str] * exposure_time / gain,
+            f'{filter_name}_pivot_wavelength': NH_PIVOT_WAVELENGTH[filter_name],
+        })
+    # Return output as a length-1 list so it works with other code
+    return [output_dict]
+
 def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
     save = readsav(file)
 
@@ -67,7 +110,7 @@ def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
         'lon': save[f'{target}_lon'],
         'lat': save[f'{target}_lat'],
     }
-    # If we only have one filter_name, return keys like "counts" instead of "NH_RED_counts"
+
     for filter_name in filter_names:
         filter_str = filter_map[filter_name]
 
@@ -197,6 +240,15 @@ def get_nh_bandpass_data(file):
 
         return wavelengths, throughputs, header
 
+def get_spectrum(target):
+    if target == 'charon':
+        return get_charon_spectrum()
+    elif target == 'pluto':
+        return get_pluto_spectrum()
+    elif target == 'hd':
+        return get_hd_spectrum()
+    raise ValueError(f"Unknown spectrum name: {target}")
+
 def get_charon_spectrum():
     wavelengths, fluxes = get_charon_spectrum_data()
     spectrum = S.ArraySpectrum(
@@ -215,6 +267,57 @@ def get_charon_spectrum_data():
             delimiter=' ',
             skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
         )
+        # Read off lines, casting everything to floats
+        data = np.array([[float(x), float(y)] for x,y in reader])
+        wavelengths, fluxes = data.transpose()
+        return wavelengths, fluxes
+
+
+def get_pluto_spectrum():
+    wavelengths, fluxes = get_pluto_spectrum_data()
+    spectrum = S.ArraySpectrum(
+        wave=wavelengths,
+        flux=fluxes,
+        name='Pluto',
+        waveunits='micron',
+    )
+    return spectrum
+
+
+def get_pluto_spectrum_data():
+    with open(PLUTO_SPECTRUM) as file:
+        reader = csv.reader(
+            file, 
+            delimiter=' ',
+            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
+        )
+        # Read off lines, casting everything to floats
+        data = np.array([[float(x), float(y)] for x,y in reader])
+        wavelengths, fluxes = data.transpose()
+        return wavelengths, fluxes
+
+
+def get_hd_spectrum():
+    wavelengths, fluxes = get_hd_spectrum_data()
+    spectrum = S.ArraySpectrum(
+        wave=wavelengths,
+        flux=fluxes,
+        name='h205905',
+        waveunits='Angstrom',
+        fluxunits='Flam'
+    )
+    return spectrum
+
+
+def get_hd_spectrum_data(filename=HD_SPECTRUM):
+    with open(filename) as file:
+        reader = csv.reader(
+            file, 
+            delimiter=' ',
+            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
+        )
+        next(reader) # Skip first line (header)
+        
         # Read off lines, casting everything to floats
         data = np.array([[float(x), float(y)] for x,y in reader])
         wavelengths, fluxes = data.transpose()
