@@ -122,6 +122,7 @@ def single_convert(
 
         plot_x.append(nh_observation['obs_to_target'])
         plot_y.append(syn_observation.effstim('vegamag'))
+        print(syn_observation.effstim('vegamag'))
 
     plt.scatter(plot_x, plot_y, label=f"{input_filter_name}", marker='x', c=utils.COLORMAP[input_filter_name])
 
@@ -211,6 +212,7 @@ def multi_convert(
 
         plot_x.append(sc_observation['obs_to_target'])
         plot_y.append(syn_observation.effstim('vegamag'))
+        print(syn_observation.effstim('vegamag'))
     print(input_bandpass_weights)
     plt.scatter(plot_x, plot_y, label=f"{input_filter_names}", alpha=0.5, c='green')
 
@@ -309,6 +311,26 @@ if __name__ == '__main__':
         output_obs_to_target=1, # 38.5 AU in km, as corrected in the Buie paper
         output_target_to_sun=1, # 39.5 AU in km, as corrected in the Buie paper
     )
+
+
+    # filters = ['NH_BLUE', 'NH_RED']
+    # output = 'HST_F555W'
+    # target = 'pluto'
+    # for f in filters:
+    #     single_convert(
+    #         target_name=target, 
+    #         input_filter_name=f,
+    #         output_filter_name=output, 
+    #         output_obs_to_target=BUIE_OBS_TO_TARGET, # 38.5 AU in km, as corrected in the Buie paper
+    #         output_target_to_sun=BUIE_TARGET_TO_SUN, # 39.5 AU in km, as corrected in the Buie paper
+    #     )
+    # multi_convert(
+    #     target_name=target, 
+    #     input_filter_names=filters,
+    #     output_filter_name=output, 
+    #     output_obs_to_target=BUIE_OBS_TO_TARGET, # 38.5 AU in km, as corrected in the Buie paper
+    #     output_target_to_sun=BUIE_TARGET_TO_SUN, # 39.5 AU in km, as corrected in the Buie paper
+    # )
 
     # plot_buie_pluto_V()
 

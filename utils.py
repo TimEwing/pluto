@@ -39,12 +39,35 @@ COLORMAP = {
     'HST_F555W': 'orange',
     'HST_F435W': 'cyan',
 }
+LABELMAP = {
+    'JOHNSON_U': 'Johnson U',
+    'JOHNSON_B': 'Johnson B',
+    'JOHNSON_V': 'Johnson V',
+    'JOHNSON_R': 'Johnson R',
+    'JOHNSON_G': 'Johnson G',
+    'NH_RED': 'Red',
+    'NH_BLUE': 'Blue',
+    'NH_NIR': 'Nir',
+    'NH_CH4': 'Ch4',
+    'NH_PAN_1': 'Pan 1',
+    'NH_PAN_2': 'Pan 2',
+    'HST_F555W': 'F555W',
+    'HST_F435W': 'F435W',
+    
+}
 
 NH_PIVOT_WAVELENGTH = { # in Angstroms
     'NH_BLUE': 4920.00,
     'NH_RED': 6240.00,
     'NH_NIR': 8610.00,
     'NH_CH4': 8830.00,
+}
+
+NH_AF = {
+    'NH_BLUE': 1.00,
+    'NH_RED': 1.21,
+    'NH_NIR': 1.32,
+    'NH_CH4': 1.46,
 }
 
 
@@ -78,12 +101,20 @@ def get_hd_observations(*filter_names):
         "ch4": 97.0,
     }
 
+    p_map = {
+        'psolar_blue': 2.024E+13,
+        'psolar_ch4': 2.703E+13,
+        'psolar_nir': 1.105E+14,
+        'psolar_red': 7.880E+13,
+    }
+
     for filter_name in filter_names:
         filter_str = filter_map[filter_name]
+        flux = data_map[filter_str] / (exposure_time * p_map[f'psolar_{filter_str}'])
 
         output_dict.update({
             f'{filter_name}_counts': data_map[filter_str],
-            f'{filter_name}_calib_flux': data_map[filter_str] * exposure_time / gain,
+            f'{filter_name}_calib_flux': flux * NH_AF[filter_name],
             f'{filter_name}_pivot_wavelength': NH_PIVOT_WAVELENGTH[filter_name],
         })
     # Return output as a length-1 list so it works with other code
@@ -117,8 +148,8 @@ def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
         expected_length = len(save['sc_range'])
 
         output_dict.update({
-            f'{filter_name}_counts': save[f'{prefix}{filter_str}_counts'],
-            f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'],
+            f'{filter_name}_counts': save[f'{prefix}{filter_str}_counts'] * NH_AF[filter_name],
+            f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'] * NH_AF[filter_name],
             f'{filter_name}_exposure': save[f'{filter_str}_exptime'],
             f'{filter_name}_pivot_wavelength': [NH_PIVOT_WAVELENGTH[filter_name]] * expected_length,
             f'{filter_name}_p': [float(save[f'p{target}_{filter_str}'])] * expected_length,
