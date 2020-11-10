@@ -47,6 +47,40 @@ NH_PIVOT_WAVELENGTH = { # in Angstroms
     'NH_CH4': 8830.00,
 }
 
+# The P values in the save seem to be wrong. Here are the correct ones, from Alex Parker
+NH_P = {
+    "pcharon_red": 8.0606e+13,
+    "ppholus_red": 8.3189e+13,
+    "pjupiter_red": 8.5762e+13,
+    "psolar_red": 8.0836e+13,
+    "ppluto_red": 8.0748e+13,
+    "pcharon_blue": 2.063e+13,
+    "ppholus_blue": 2.1424e+13,
+    "pjupiter_blue": 2.048e+13,
+    "psolar_blue": 2.0685e+13,
+    "ppluto_blue": 2.0974e+13,
+    "pcharon_nir": 1.0959e+14,
+    "ppholus_nir": 1.0634e+14,
+    "pjupiter_nir": 1.7801e+14,
+    "psolar_nir": 1.096e+14,
+    "ppluto_nir": 1.1041e+14,
+    "pcharon_ch4": 2.6702e+13,
+    "ppholus_ch4": 2.6578e+13,
+    "pjupiter_ch4": 6.3653e+13,
+    "psolar_ch4": 2.6703e+13,
+    "ppluto_ch4": 2.6872e+13,
+    "pcharon_pan1": 2.5192e+14,
+    "ppholus_pan1": 2.5427e+14,
+    "pjupiter_pan1": 2.1761e+14,
+    "psolar_pan1": 2.5341e+14,
+    "ppluto_pan1": 2.4377e+14,
+    "pcharon_pan2": 2.4398e+14,
+    "ppholus_pan2": 2.4626e+14,
+    "pjupiter_pan2": 2.1076e+14,
+    "psolar_pan2": 2.4543e+14,
+    "ppluto_pan2": 2.3609e+14,
+}
+
 
 def get_observations(target, *filter_names):
     if target == 'hd':
@@ -80,10 +114,11 @@ def get_hd_observations(*filter_names):
 
     for filter_name in filter_names:
         filter_str = filter_map[filter_name]
+        flux = data_map[filter_str] / (exposure_time * NH_P[f'psolar_{filter_str}'])
 
         output_dict.update({
             f'{filter_name}_counts': data_map[filter_str],
-            f'{filter_name}_calib_flux': data_map[filter_str] * exposure_time / gain,
+            f'{filter_name}_calib_flux': flux,
             f'{filter_name}_pivot_wavelength': NH_PIVOT_WAVELENGTH[filter_name],
         })
     # Return output as a length-1 list so it works with other code
@@ -121,7 +156,7 @@ def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
             f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'],
             f'{filter_name}_exposure': save[f'{filter_str}_exptime'],
             f'{filter_name}_pivot_wavelength': [NH_PIVOT_WAVELENGTH[filter_name]] * expected_length,
-            f'{filter_name}_p': [float(save[f'p{target}_{filter_str}'])] * expected_length,
+            f'{filter_name}_p': [NH_P[f'p{target}_{filter_str}']] * expected_length,
         })
     # Return the transpose of the output_dict, i.e. a list of observations
     return transform_dict(output_dict, output_dict.keys())
