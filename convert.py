@@ -1,6 +1,7 @@
 # third party imports
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 # custom module imports
 from utils import S
@@ -53,17 +54,51 @@ def normalize_spectrum_to_distance(spectrum,
     return corrected_spectrum
 
 
-# Normalize a spectrum to match an observation and a distance
-def normalize_spectrum(
+def get_correlation_factors(
         spectrum, 
+        input_bandpass_names, 
+        output_bandpass_name):
+
+    output_bandpass = utils.get_bandpass(output_bandpass_name)
+
+    # Get the flux from observing as if you held one filter in front of the other
+    correlation_factors = {}
+    for input_bandpass_name in input_bandpass_names:
+        input_bandpass = utils.get_bandpass(input_bandpass_name)
+        # Perform synthetic observations
+        observation = S.Observation(spectrum, input_bandpass, force='taper')
+        observation = S.Observation(observation, output_bandpass, force='taper')
+
+        # Can't be vegamag since magnitudes don't add linearly; needs to be flam
+        try:
+            correlation_factors[input_bandpass_name] = observation.effstim('flam')
+        except ValueError:
+            # 0 effstim
+            correlation_factors[input_bandpass_name] = 0
+
+    # Normalize factors
+    factor_sum = sum(correlation_factors.values())
+    correlation_factors = {k: v/factor_sum for k, v in correlation_factors.items()}
+
+    return correlation_factors
+
+
+# Convert an observation to an output filter and distance
+def single_convert(
+        spectrum, output_bandpass_name,
         pivot_wavelength, calib_flux, 
         input_obs_to_target, input_target_to_sun, 
-        output_obs_to_target, output_target_to_sun):
+        output_obs_to_target, output_target_to_sun,
+        return_observation=True):
+    # get lab-calibrated data of filter throughputs
+    output_bandpass = utils.get_bandpass(output_bandpass_name)
+    output_bandpass.convert('Angstrom')
 
     spectrum.convert('Angstrom')
     spectrum.convert('flam')
 
-    # Normalize spectrum to observed value using builtin pysynphot renorm function
+    ## Normalize spectrum to observed value using builtin pysynphot renorm function
+    # This sets the value of the spectrum at the pivot wavelength to calib_flux
     spectrum = normalize_spectrum_to_wavelength(
         spectrum,
         pivot_wavelength,
@@ -78,21 +113,28 @@ def normalize_spectrum(
         output_obs_to_target_distance=output_obs_to_target,
         output_sun_to_target_distance=output_target_to_sun,
     )
-    return spectrum
+
+    observation = S.Observation(
+        spectrum,
+        output_bandpass,
+        force='taper',
+    )
+
+    # Multi-convert needs spectra, not observations
+    if return_observation:
+        return observation
+    else:
+        return spectrum
+
 
 
 # Convert from one single filter
 # Distances are in the same units as the new horizons file, usually km
-def single_convert(
+def plot_single_convert(
         target_name, # not fully implemented yet
         input_filter_name, output_filter_name, 
         output_obs_to_target=BUIE_OBS_TO_TARGET, 
         output_target_to_sun=BUIE_TARGET_TO_SUN):
-    # get lab-calibrated data of filter throughputs
-    input_bandpass = utils.get_bandpass(input_filter_name)
-    input_bandpass.convert('Angstrom')
-    output_bandpass = utils.get_bandpass(output_filter_name)
-    output_bandpass.convert('Angstrom')
     # get recorded observations from new horizons
     nh_observations = utils.get_observations(target_name, input_filter_name)
     # setup plot
@@ -102,9 +144,9 @@ def single_convert(
     for nh_observation in nh_observations:
         spectrum = utils.get_spectrum(target)
 
-        # Normalize spectrum to the observation and the distances
-        spectrum = normalize_spectrum(
+        converted_obs = single_convert(
             spectrum=spectrum,
+            output_bandpass_name=output_filter_name,
             pivot_wavelength=nh_observation[f'{input_filter_name}_pivot_wavelength'],
             calib_flux=nh_observation[f'{input_filter_name}_calib_flux'],
             input_obs_to_target=nh_observation['obs_to_target'],
@@ -112,225 +154,201 @@ def single_convert(
             output_obs_to_target=output_obs_to_target,
             output_target_to_sun=output_target_to_sun,
         )
-        
-        # Observe normalized spectrum using output filter (usually HST or Johnson)
-        syn_observation = S.Observation(
-            spectrum, 
-            output_bandpass,
-            force='taper',
-        )
+
 
         plot_x.append(nh_observation['obs_to_target'])
-        plot_y.append(syn_observation.effstim('vegamag'))
-        print(syn_observation.effstim('vegamag'))
+        plot_y.append(converted_obs.effstim('vegamag'))
 
-    plt.scatter(plot_x, plot_y, label=f"{input_filter_name}", marker='x', c=utils.COLORMAP[input_filter_name])
+    plt.scatter(plot_x, plot_y, label=f"{input_filter_name}", marker='x', 
+        c=utils.COLORMAP[input_filter_name])
 
-def multi_convert_plot(
-        target_name,
-        input_bandpasses, output_bandpass,
-        ):
-    pass
-    
 
 def multi_convert(
-        target_name,
-        input_filter_names, output_filter_name,
-        output_obs_to_target=BUIE_OBS_TO_TARGET,
+        spectrum, 
+        input_bandpass_names, output_bandpass_name,
+        pivot_wavelengths, calib_fluxes, 
+        input_obs_to_target, input_target_to_sun, 
+        output_obs_to_target, output_target_to_sun):
+    # Get correlation factors to adjust for multi-filter overlap
+    correlation_factors = get_correlation_factors(
+        spectrum, 
+        input_bandpass_names,
+        output_bandpass_name,
+    )
+
+    # Convert via the single-convert method and add the result to the output
+    output_wave = None
+    output_flux = None
+    for input_bandpass_name in input_bandpass_names:
+        converted_spectrum = single_convert(
+            spectrum=spectrum,
+            output_bandpass_name=output_bandpass_name,
+            pivot_wavelength=pivot_wavelengths[input_bandpass_name],
+            calib_flux=calib_fluxes[input_bandpass_name],
+            input_obs_to_target=input_obs_to_target,
+            input_target_to_sun=input_target_to_sun,
+            output_obs_to_target=output_obs_to_target,
+            output_target_to_sun=output_target_to_sun,
+            return_observation=False, # We need spectrum objects to combine them, not observations
+        )
+        # It should already be in the right units, but if that changes make sure this code
+        # doesn't break
+        converted_spectrum.convert('Angstrom')
+        converted_spectrum.convert('flam')
+        # Add the converted observation, weighted by the correlation factor
+        if output_flux is None:
+            # if this is the first observation, assign instead of adding
+            output_wave = converted_spectrum.wave
+            output_flux = converted_spectrum.flux * correlation_factors[input_bandpass_name]
+        else:
+            output_flux += converted_spectrum.flux * correlation_factors[input_bandpass_name]
+
+    # Construct the output spectrum
+    output_spectrum = S.ArraySpectrum(
+        wave=output_wave,
+        flux=output_flux,
+        waveunits='Angstrom',
+        fluxunits='flam',
+        name=f"{spectrum.name}_weighted",
+    )
+
+
+    # Observe output spectrum using output filter (usually HST or Johnson)
+    output_bandpass = utils.get_bandpass(output_bandpass_name)
+
+    output_observation = S.Observation(
+        output_spectrum, 
+        output_bandpass,
+        force='taper',
+    )
+    return output_observation
+
+# Convert from multiple filters
+# Distances are in the same units as the new horizons file, usually km
+def plot_multi_convert(
+        target_name, # not fully implemented yet
+        input_filter_names, output_filter_name, 
+        output_obs_to_target=BUIE_OBS_TO_TARGET, 
         output_target_to_sun=BUIE_TARGET_TO_SUN):
-    # get lab-calibrated data of filter throughputs and nh observations
-    input_bandpasses = {}
-    for input_bandpass_name in input_filter_names:
-        input_bandpass = utils.get_bandpass(input_bandpass_name)
-        input_bandpass.convert('Angstrom')
-        input_bandpasses[input_bandpass_name] = input_bandpass
-    # get output filter throughputs
-    output_bandpass = utils.get_bandpass(output_filter_name)
-    output_bandpass.convert('Angstrom')
-
-    # find values for weighted average of input observations
-    input_bandpass_fluxes = {}
-    for input_bandpass in input_bandpasses:
-        spectrum = utils.get_spectrum(target)
-        # first, observe the input bandpass
-        observation = S.Observation(spectrum, input_bandpasses[input_bandpass], force='taper')
-        observation = S.Observation(observation, output_bandpass, force='taper')
-        input_bandpass_fluxes[input_bandpass] = observation.effstim('flam')
-    # normalize and find weight
-    total_flux = sum([flux for flux in input_bandpass_fluxes.values()])
-    input_bandpass_weights = {}
-    for input_bandpass, flux in input_bandpass_fluxes.items():
-        input_bandpass_weights[input_bandpass] = flux / total_flux
-
+    # get recorded observations from new horizons
+    nh_observations = utils.get_observations(target_name, *input_filter_names)
     # setup plot
     plot_x = []
     plot_y = []
 
-    # get new horizons observations
-    sc_observations = utils.get_observations(target_name, *input_filter_names)
-    # convert from input filters to output filter
-    for sc_observation in sc_observations:
-        spectra = {}
-        # We need to reconstruct the target spectrum often because we often modify it
+    for nh_observation in nh_observations:
         spectrum = utils.get_spectrum(target)
-        spectrum.convert('Angstrom')
-        summed_wave = spectrum.wave # Just using the target spectrum to get the length right
-        summed_flux = spectrum.flux * 0 # array of 0s with the same length as the target spectrum
-        for input_bandpass_name, input_bandpass in input_bandpasses.items(): 
-            spectrum = utils.get_spectrum(target)
-            spectrum.convert('Angstrom')
-            spectrum.convert('flam')
+        # Parse out pivot wavelengths and fluxes 
+        pivot_wavelengths = {
+            input_filter_name: nh_observation[f'{input_filter_name}_pivot_wavelength']
+            for input_filter_name in input_filter_names
+        }
+        fluxes = {
+            input_filter_name: nh_observation[f'{input_filter_name}_calib_flux']
+            for input_filter_name in input_filter_names
+        }
 
-            # Normalize spectrum to the observation and the distances
-            spectrum = normalize_spectrum(
-                spectrum=spectrum,
-                pivot_wavelength=sc_observation[f'{input_bandpass_name}_pivot_wavelength'],
-                calib_flux=sc_observation[f'{input_bandpass_name}_calib_flux'],
-                input_obs_to_target=sc_observation['obs_to_target'],
-                input_target_to_sun=sc_observation['sun_to_target'],
-                output_obs_to_target=output_obs_to_target,
-                output_target_to_sun=output_target_to_sun,
+        converted_obs = multi_convert(
+            spectrum=spectrum,
+            input_bandpass_names=input_filter_names,
+            output_bandpass_name=output_filter_name,
+            pivot_wavelengths=pivot_wavelengths,
+            calib_fluxes=fluxes,
+            input_obs_to_target=nh_observation['obs_to_target'],
+            input_target_to_sun=nh_observation['sun_to_target'],
+            output_obs_to_target=output_obs_to_target,
+            output_target_to_sun=output_target_to_sun,
+        )
+        converted_obs.convert('Angstrom')
+
+        plot_x.append(nh_observation['obs_to_target'])
+        plot_y.append(converted_obs.effstim('vegamag'))
+
+    plt.scatter(plot_x, plot_y, label=f"{', '.join(input_filter_names)}", marker='x', 
+        c='purple')
+    
+
+def get_factor_table(spectrum_names, input_filter_names, output_filter_names, **kwargs):
+    # Get the row labels from the filter names
+    input_filter_labels = [utils.LABELMAP[x] for x in input_filter_names]
+
+    index = pd.MultiIndex.from_product(
+        [spectrum_names, input_filter_names], 
+        names=['Target', 'Input Filter'])
+
+    # Using a pandas dataframe so we can use the builtin to_latex function
+    df = pd.DataFrame(
+        np.zeros((len(spectrum_names)*len(input_filter_names), len(output_filter_names))),
+        index=index,
+        columns=output_filter_names,
+        dtype=float,
+    )
+    for spectrum_name in spectrum_names:
+        # Get target spectrum
+        spectrum = utils.get_spectrum(spectrum_name)
+        for output_filter_name in output_filter_names:
+            # Get cfs
+            cfs = get_correlation_factors(
+                spectrum,
+                input_filter_names, 
+                output_filter_name
             )
+            # If the cf is 0, replace it with ''
+            cfs = {k:(v if v > 1e-5 else None) for k,v in cfs.items()}
+            # Put cfs in dataframe
+            for input_filter_name in cfs:
+                df.loc[spectrum_name, input_filter_name][output_filter_name] = cfs[input_filter_name]
 
-            # Add the spectrum * the weight to the summed spectra
-            summed_flux += spectrum.flux * input_bandpass_weights[input_bandpass_name]
-
-        spectrum = utils.get_spectrum(target)
-        summed_spectra = S.ArraySpectrum(
-            wave=summed_wave,
-            flux=summed_flux,
-            waveunits='Angstrom',
-            fluxunits='flam',
-            name=f"{spectrum.name}_weighted",
-        )
-        # Observe normalized spectrum using output filter (usually HST or Johnson)
-        syn_observation = S.Observation(
-            summed_spectra, 
-            output_bandpass,
-            force='taper',
-        )
-
-        plot_x.append(sc_observation['obs_to_target'])
-        plot_y.append(syn_observation.effstim('vegamag'))
-        print(syn_observation.effstim('vegamag'))
-    print(input_bandpass_weights)
-    plt.scatter(plot_x, plot_y, label=f"{input_filter_names}", alpha=0.5, c='green')
+    # Rename the index to the pretty names
+    df.rename(index=utils.LABELMAP, columns=utils.LABELMAP, inplace=True)
+    return df.T.to_latex(**kwargs)
 
 
-# def filter_plots():
-#     # matplotlib setup
-#     fig, ax = plt.subplots()
-#     ax.set_prop_cycle(linestyle=['-', '--', ':', '-.'])
-
-#     bandpasses = ['NH_RED', 'NH_BLUE']
-#     nh_observation = utils.get_observations('charon', *bandpasses)[0]
-#     for input_bandpass_name in bandpasses:
-#         input_bandpass = utils.get_bandpass(input_bandpass_name)
-#         input_spectrum = utils.get_spectrum(target)
-#         input_observed_effstim = 0.1 # fake number in photlam, about 50% of what the synthetic obs is
-#         output_bandpass = utils.get_bandpass('HST_F555W')
-
-#         # Convert everything to angstrom
-#         input_spectrum.convert('Angstrom')
-#         input_bandpass.convert('Angstrom')
-#         output_bandpass.convert('Angstrom')
-
-#         output_obs_to_target=5.760E9, # 38.5 AU in km, as corrected in the Buie paper
-#         output_target_to_sun=5.909E9, # 39.5 AU in km, as corrected in the Buie paper
-#         input_spectrum = normalize_spectrum(
-#             spectrum=input_spectrum,
-#             pivot_wavelength=nh_observation[f'{input_bandpass_name}_pivot_wavelength'],
-#             calib_flux=nh_observation[f'{input_bandpass_name}_calib_flux'],
-#             input_obs_to_target=nh_observation['obs_to_target'],
-#             input_target_to_sun=nh_observation['sun_to_target'],
-#             output_obs_to_target=output_obs_to_target,
-#             output_target_to_sun=output_target_to_sun,
-#         )
-
-
-#         # Simulate the spectrum through both bandpasses, as if you had held the input filter in front of
-#         # the output filter
-#         observation = S.Observation(input_spectrum, input_bandpass)
-#         observation = S.Observation(observation, output_bandpass)
-
-#         # TODO: Adjust for viewing geometry
-
-#         # Plot output spectra
-#         observation.convert('vegamag')
-#         ax.plot(
-#             observation.binwave, 
-#             observation.binflux, 
-#             label=observation.name,
-#             c='blue',
-#         )
-
-#     # Plot vega and input spectrum
-#     # Input spectra
-#     input_spectrum.convert('vegamag')
-#     ax.plot(input_spectrum.wave, input_spectrum.flux, label=input_spectrum.name, c='blue')
-#     ax.tick_params(axis='y', labelcolor='blue')
-#     ax.legend(loc='upper left')
-#     ax.invert_yaxis()
-#     ax.set_xlim(observation.wave.min(), observation.wave.max())
-#     ax.set_ylim(25, 0)
-
-#     ## Plot bandpasses on same plot with different scale
-#     ax_bandpass = ax.twinx()  # instantiate a second axes that shares the same x-axis
-#     ax_bandpass.tick_params(axis='y', labelcolor='red')
-#     ax_bandpass.set_prop_cycle(linestyle=['-', '--', ':', '-.'])
-#     for bandpass in bandpasses + ['HST_F555W']:
-#         bandpass = utils.get_bandpass(bandpass)
-#         bandpass.convert('angstrom')
-#         ax_bandpass.plot(bandpass.wave, bandpass.throughput, label=bandpass, color='red')
-#     ax_bandpass.legend(loc='upper right')
-
-#     plt.show()
-
-def plot_buie_pluto_V(x_field='Elon'):
+def plot_buie_pluto_V(x_field='Elon', **kwargs):
     data = np.genfromtxt('data/buie_pluto_v.csv', delimiter=',', names=True)
     plt.scatter(data[x_field], data['V'], label='Buie Pluto V', color='Black')
 
 
 # This if statement runs only if the module is called from the command line
 if __name__ == '__main__':
-    filters = ['NH_BLUE', 'NH_RED']
-    output = 'HST_F555W'
-    target = 'hd'
-    for f in filters:
-        single_convert(
-            target_name=target, 
-            input_filter_name=f,
-            output_filter_name=output, 
-            output_obs_to_target=1, # 38.5 AU in km, as corrected in the Buie paper
-            output_target_to_sun=1, # 39.5 AU in km, as corrected in the Buie paper
-        )
-    multi_convert(
-        target_name=target, 
-        input_filter_names=filters,
-        output_filter_name=output, 
-        output_obs_to_target=1, # 38.5 AU in km, as corrected in the Buie paper
-        output_target_to_sun=1, # 39.5 AU in km, as corrected in the Buie paper
-    )
-
-
     # filters = ['NH_BLUE', 'NH_RED']
     # output = 'HST_F555W'
-    # target = 'pluto'
+    # target = 'hd'
     # for f in filters:
     #     single_convert(
     #         target_name=target, 
     #         input_filter_name=f,
     #         output_filter_name=output, 
-    #         output_obs_to_target=BUIE_OBS_TO_TARGET, # 38.5 AU in km, as corrected in the Buie paper
-    #         output_target_to_sun=BUIE_TARGET_TO_SUN, # 39.5 AU in km, as corrected in the Buie paper
+    #         output_obs_to_target=1, # 38.5 AU in km, as corrected in the Buie paper
+    #         output_target_to_sun=1, # 39.5 AU in km, as corrected in the Buie paper
     #     )
     # multi_convert(
     #     target_name=target, 
     #     input_filter_names=filters,
     #     output_filter_name=output, 
-    #     output_obs_to_target=BUIE_OBS_TO_TARGET, # 38.5 AU in km, as corrected in the Buie paper
-    #     output_target_to_sun=BUIE_TARGET_TO_SUN, # 39.5 AU in km, as corrected in the Buie paper
+    #     output_obs_to_target=1, # 38.5 AU in km, as corrected in the Buie paper
+    #     output_target_to_sun=1, # 39.5 AU in km, as corrected in the Buie paper
     # )
+
+
+    filters = ['NH_BLUE', 'NH_RED']
+    output = 'HST_F555W'
+    target = 'hd'
+    for f in filters:
+        plot_single_convert(
+            target_name=target, 
+            input_filter_name=f,
+            output_filter_name=output, 
+            output_obs_to_target=BUIE_OBS_TO_TARGET, # 38.5 AU in km, as corrected in the Buie paper
+            output_target_to_sun=BUIE_TARGET_TO_SUN, # 39.5 AU in km, as corrected in the Buie paper
+        )
+    plot_multi_convert(
+        target_name=target, 
+        input_filter_names=filters,
+        output_filter_name=output, 
+        output_obs_to_target=BUIE_OBS_TO_TARGET, # 38.5 AU in km, as corrected in the Buie paper
+        output_target_to_sun=BUIE_TARGET_TO_SUN, # 39.5 AU in km, as corrected in the Buie paper
+    )
 
     # plot_buie_pluto_V()
 

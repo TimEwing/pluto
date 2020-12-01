@@ -36,10 +36,14 @@ COLORMAP = {
     'NH_CH4': 'green',
     'NH_PAN_1': 'hotpink',
     'NH_PAN_2': 'purple',
-    'HST_F555W': 'orange',
+    'HST_F555W': 'tomato',
     'HST_F435W': 'cyan',
 }
 LABELMAP = {
+    'pluto': 'Pluto',
+    'charon': 'Charon',
+    'hd': 'HD205905',
+    'vega': 'Vega',
     'JOHNSON_U': 'Johnson U',
     'JOHNSON_B': 'Johnson B',
     'JOHNSON_V': 'Johnson V',
@@ -53,7 +57,6 @@ LABELMAP = {
     'NH_PAN_2': 'Pan 2',
     'HST_F555W': 'F555W',
     'HST_F435W': 'F435W',
-    
 }
 
 NH_PIVOT_WAVELENGTH = { # in Angstroms
@@ -63,6 +66,7 @@ NH_PIVOT_WAVELENGTH = { # in Angstroms
     'NH_CH4': 8830.00,
 }
 
+# New Horizons Adjustment Factors
 NH_AF = {
     'NH_BLUE': 1.00,
     'NH_RED': 1.21,
@@ -155,14 +159,13 @@ def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
             f'{filter_name}_p': [float(save[f'p{target}_{filter_str}'])] * expected_length,
         })
     # Return the transpose of the output_dict, i.e. a list of observations
-    return transform_dict(output_dict, output_dict.keys())
+    return transpose_dict(output_dict, output_dict.keys())
 
 
-def transform_dict(input_dict, fields):
+def transpose_dict(input_dict, fields):
     ## Given a dict and a list of fields, return a list of dicts. I.e.
     #   inputs: input_dict={'a': [1,2,3], 'b': [4,5,6]}, fields=['a','b']
     #   output: [{'a': 1, 'b', 4}, {'a': 2, 'b', 5}, {'a': 3, 'b', 6}]
-    # if new fields names is included, it should be a dict like {'old_field': 'new_field'}
 
     # Zip lists together
     zipped_lists = zip(*[input_dict[field] for field in fields]) # * operator passes lists as args
@@ -278,6 +281,8 @@ def get_spectrum(target):
         return get_pluto_spectrum()
     elif target == 'hd':
         return get_hd_spectrum()
+    elif target == 'vega':
+        return S.Vega
     raise ValueError(f"Unknown spectrum name: {target}")
 
 def get_charon_spectrum():
