@@ -14,11 +14,14 @@ import pysynphot as S # Importing it as S bad style for python, but used by the 
 S.setref(area=176.7) # cm^2; using 75mm radius aperture from DOI: 10.1117/12.617901
 
 # Constants
+REWRITE_DATA_FILE = False # Set to true to make plots write to output.csv
+
 NH_FILTER_DIR = 'data/nh_filters'
 HST_FILTER_DIR = 'data/hst_filters'
 CHARON_SPECTRUM = 'data/spectra/charon_spectrum.dat'
 PLUTO_SPECTRUM = 'data/spectra/pluto_spectrum.dat'
 HD_SPECTRUM = 'data/hd205905_spectrum_withheader.txt'
+OUTPUT_DATA_FILE = 'data/output.csv'
 # vegafile not used since pysynphot comes with a vega spectrum
 # VEGAFILE = 'data/vega_spectrum.fits'
 NH_OBSERVATION_FILE = 'data/nh_obs.idlsave'
@@ -68,11 +71,17 @@ NH_PIVOT_WAVELENGTH = { # in Angstroms
 
 # New Horizons Adjustment Factors
 NH_AF = {
-    'NH_BLUE': 1.00,
-    'NH_RED': 1.21,
-    'NH_NIR': 1.32,
-    'NH_CH4': 1.46,
+    'NH_BLUE': {0: 1.02, 1: 0.99}, 
+    'NH_RED': {0: 1.23, 1: 1.21}, 
+    'NH_NIR': {0: 1.38, 1: 1.27}, 
+    'NH_CH4': {0: 1.46, 1: 1.44}, 
 }
+
+
+def write_to_output(name, data):
+    if REWRITE_DATA_FILE:
+        with open(OUTPUT_DATA_FILE, 'a') as out:
+            out.write(f"{name},{','.join(data)}\n")
 
 
 def get_observations(target, *filter_names):
@@ -115,10 +124,12 @@ def get_hd_observations(*filter_names):
     for filter_name in filter_names:
         filter_str = filter_map[filter_name]
         flux = data_map[filter_str] / (exposure_time * p_map[f'psolar_{filter_str}'])
+        # raise NotImplementedError("What side is the HD observation?")
+        side = 1
 
         output_dict.update({
             f'{filter_name}_counts': data_map[filter_str],
-            f'{filter_name}_calib_flux': flux * NH_AF[filter_name],
+            f'{filter_name}_calib_flux': flux * NH_AF[filter_name][side],
             f'{filter_name}_pivot_wavelength': NH_PIVOT_WAVELENGTH[filter_name],
         })
     # Return output as a length-1 list so it works with other code
@@ -144,16 +155,18 @@ def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
         'sun_to_target': save['targ_sun'],
         'lon': save[f'{target}_lon'],
         'lat': save[f'{target}_lat'],
+        'met': save['met'],
     }
 
     for filter_name in filter_names:
         filter_str = filter_map[filter_name]
 
         expected_length = len(save['sc_range'])
+        adjustment_factors = np.array([NH_AF[filter_name][side] for side in save['side']])
 
         output_dict.update({
-            f'{filter_name}_counts': save[f'{prefix}{filter_str}_counts'] * NH_AF[filter_name],
-            f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'] * NH_AF[filter_name],
+            f'{filter_name}_counts': save[f'{prefix}{filter_str}_counts'] * adjustment_factors,
+            f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'] * adjustment_factors,
             f'{filter_name}_exposure': save[f'{filter_str}_exptime'],
             f'{filter_name}_pivot_wavelength': [NH_PIVOT_WAVELENGTH[filter_name]] * expected_length,
             f'{filter_name}_p': [float(save[f'p{target}_{filter_str}'])] * expected_length,
