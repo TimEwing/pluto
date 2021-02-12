@@ -418,4 +418,19 @@ def plot_buie(
         data[x_field], data[band], 
         **kwargs
     )
-    
+
+
+# Data should look like a list of (n, an, bn)
+def plot_fourier(fig, ax, data, x_range=(0,360), step=1, offset=0, **kwargs):
+    kwargs.setdefault('label', f'fourier series')
+    kwargs.setdefault('c', 'green')
+
+    x = np.arange(*x_range, step, dtype=float)
+    y = np.zeros(x.shape)
+    for n, an, bn in data:
+        y += np.cos(2.0*np.pi/x_range[1] * x * n) * an
+        y += np.sin(2.0*np.pi/x_range[1] * x * n) * bn
+
+    y += offset
+
+    ax.plot(x, y, **kwargs)
