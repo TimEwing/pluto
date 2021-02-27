@@ -14,45 +14,6 @@ BUIE_OBS_TO_TARGET = 5.760E9
 BUIE_TARGET_TO_SUN = 5.909E9
 
 
-def normalize_spectrum_to_wavelength(spectrum, pivot_wavelength, observed_value):
-    expected_value = spectrum.sample(pivot_wavelength)
-    # Adjust the spectrum by the ratio of observed/simulated
-    correction_ratio = observed_value/expected_value
-    corrected_flux = spectrum.flux * correction_ratio
-    # Create a new spectrum because spectrum.flux is readonly
-    corrected_spectrum = S.ArraySpectrum(
-        wave=spectrum.wave,
-        flux=corrected_flux,
-        waveunits=spectrum.waveunits,
-        fluxunits=spectrum.fluxunits,
-        name=f"{spectrum.name}_corrected"
-    )
-    return corrected_spectrum
-
-
-def normalize_spectrum_to_distance(spectrum, 
-        input_obs_to_target_distance, input_sun_to_target_distance,
-        output_obs_to_target_distance, output_sun_to_target_distance):
-    input_unit = spectrum.fluxunits
-    spectrum.convert('flam') # We need to work in a non-log unit
-
-    # Correct for different observation distances
-    obs_ratio = (input_obs_to_target_distance / output_obs_to_target_distance)**2
-    # Correct for different target->sun differences (lower illumination further away)
-    sun_ratio = (input_sun_to_target_distance / output_sun_to_target_distance)**2
-    # Correct the flux
-    corrected_flux = spectrum.flux * obs_ratio * sun_ratio
-    # Create a new spectrum because spectrum.flux is read-only
-    corrected_spectrum = S.ArraySpectrum(
-        wave=spectrum.wave,
-        flux=corrected_flux,
-        waveunits=spectrum.waveunits,
-        fluxunits=spectrum.fluxunits,
-        name=f"{spectrum.name}_corrected-distance",
-    )
-    corrected_spectrum.convert(input_unit)
-    return corrected_spectrum
-
 
 def get_correlation_factors(
         spectrum, 
@@ -82,49 +43,6 @@ def get_correlation_factors(
 
     return correlation_factors
 
-
-# Convert an observation to an output filter and distance
-def single_convert(
-        spectrum, output_bandpass_name,
-        pivot_wavelength, calib_flux, 
-        input_obs_to_target, input_target_to_sun, 
-        output_obs_to_target, output_target_to_sun,
-        return_observation=True):
-    # get lab-calibrated data of filter throughputs
-    output_bandpass = utils.get_bandpass(output_bandpass_name)
-    output_bandpass.convert('Angstrom')
-
-    spectrum.convert('Angstrom')
-    spectrum.convert('flam')
-
-    ## Normalize spectrum to observed value using builtin pysynphot renorm function
-    # This sets the value of the spectrum at the pivot wavelength to calib_flux
-    spectrum = normalize_spectrum_to_wavelength(
-        spectrum,
-        pivot_wavelength,
-        calib_flux,
-    )
-
-    # Normalize spectrum to output distance
-    spectrum = normalize_spectrum_to_distance(
-        spectrum,
-        input_obs_to_target_distance=input_obs_to_target,
-        input_sun_to_target_distance=input_target_to_sun,
-        output_obs_to_target_distance=output_obs_to_target,
-        output_sun_to_target_distance=output_target_to_sun,
-    )
-
-    observation = S.Observation(
-        spectrum,
-        output_bandpass,
-        force='taper',
-    )
-
-    # Multi-convert needs spectra, not observations
-    if return_observation:
-        return observation
-    else:
-        return spectrum
 
 
 
@@ -418,6 +336,15 @@ def plot_buie(
         data[x_field], data[band], 
         **kwargs
     )
+
+def get_fourier(data, x_range=(0,360)):
+    f = lambda x: x
+
+    for n, an, bn in data:
+        f = lambda x: f(x) + np.cos(x_range[0] + 2.0*np.pi/x_range[1] * x * n) * an
+        f = lambda x: f(x) + np.sin(x_range[0] + 2.0*np.pi/x_range[1] * x * n) * bn
+
+    return f
 
 
 # Data should look like a list of (n, an, bn)

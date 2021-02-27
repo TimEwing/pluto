@@ -135,7 +135,9 @@ def get_hd_observations(*filter_names):
     # Return output as a length-1 list so it works with other code
     return [output_dict]
 
-def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
+def get_nh_observations(
+        target, *filter_names, 
+        file=NH_OBSERVATION_FILE,):
     save = readsav(file)
 
     if target == 'pluto':
@@ -155,7 +157,7 @@ def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
         'sun_to_target': save['targ_sun'],
         'lon': save[f'{target}_lon'],
         'lat': save[f'{target}_lat'],
-        'met': save['met'],
+        'met': save['met'].tolist(), # tolist casts int32s to ints for json
     }
 
     for filter_name in filter_names:
@@ -167,10 +169,9 @@ def get_nh_observations(target, *filter_names, file=NH_OBSERVATION_FILE):
         output_dict.update({
             f'{filter_name}_counts': save[f'{prefix}{filter_str}_counts'] * adjustment_factors,
             f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'] * adjustment_factors,
-            f'{filter_name}_exposure': save[f'{filter_str}_exptime'],
             f'{filter_name}_pivot_wavelength': [NH_PIVOT_WAVELENGTH[filter_name]] * expected_length,
-            f'{filter_name}_p': [float(save[f'p{target}_{filter_str}'])] * expected_length,
         })
+
     # Return the transpose of the output_dict, i.e. a list of observations
     return transpose_dict(output_dict, output_dict.keys())
 
