@@ -15,12 +15,12 @@ The input file must have the following keys:
 
 The output file will be a copy of the input file, with the following fields 
 added:
-    output_filter: the name of the output filter, i.e. HST_F435W or JOHNSON_B
-    norm_obs_to_target: the new spacecraft range to which all data is normalized
+    output_bandpass: the name of the output filter, i.e. HST_F435W or JOHNSON_B
+    converted_obs_to_target: the new spacecraft range to which all data is normalized
     sun_to_target: the new distance from the target to the sun
     data:
-        norm_flux: the converted flux, in flam
-        norm_vegamag: the converted flux, in the vegamag system
+        converted_flux: the converted flux, in flam
+        converted_vegamag: the converted flux, in the vegamag system
 """
 
 # stdlib imports
@@ -89,11 +89,11 @@ def convert_dict(
         )
 
         # Add results to the data dict
-        datapoint['norm_flux'] = observation.effstim('flam')
-        datapoint['norm_vegamag'] = observation.effstim('vegamag')
+        datapoint['converted_flux'] = observation.effstim('flam')
+        datapoint['converted_vegamag'] = observation.effstim('vegamag')
 
-    data['output_filter'] = output_bandpass_name
-    data['norm_obs_to_target'] = output_obs_to_target
+    data['output_bandpass'] = output_bandpass_name
+    data['converted_obs_to_target'] = output_obs_to_target
     data['sun_to_target'] = sun_to_target
 
     # Ensure that the 'data' entry is last in the json file for readability

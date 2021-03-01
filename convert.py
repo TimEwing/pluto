@@ -14,7 +14,6 @@ BUIE_OBS_TO_TARGET = 5.760E9
 BUIE_TARGET_TO_SUN = 5.909E9
 
 
-
 def get_correlation_factors(
         spectrum, 
         input_bandpass_names, 

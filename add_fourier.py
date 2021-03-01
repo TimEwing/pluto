@@ -1,5 +1,12 @@
 docstr = """
-TODO
+This script adds a datapoint for each row in the input .json: the output of
+a fourier fit to that longitude using the fourier series values in the 
+fourier_file.
+
+The fourier file should have 5 columns and a header row, like
+    n,an,σa,bn,σb
+where n is the fourier series n, an is the cosine coefficient, and bn is the 
+sine coefficient. 
 """
 
 # stdlib imports
