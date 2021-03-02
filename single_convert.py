@@ -26,6 +26,7 @@ added:
 # stdlib imports
 import argparse
 import json
+from datetime import datetime
 # custom module imports
 from utils import S
 import utils
@@ -43,6 +44,8 @@ def convert_json(
         output_obs_to_target, sun_to_target,
     )
 
+    if output_filename is None:
+        output_filename = get_output_filename(data)
     with open(output_filename, 'w') as f:
         json.dump(data, f, indent=2) # indent for readable json file
 
@@ -144,6 +147,13 @@ def normalize_spectrum_to_distance(spectrum,
     return corrected_spectrum
 
 
+def get_output_filename(data):
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S.%f')
+    target = data['target']
+    bandpass_name = data['bandpass_name']
+    return f"cnv.{target}.{bandpass_name}.{timestamp}.json"
+
+
 # Parse args when run from bash
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -163,7 +173,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--output", 
         help="output file name",
-        default="output.json",
+        default=None,
     )
     parser.add_argument(
         "--d", 

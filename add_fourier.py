@@ -32,10 +32,19 @@ def fourier_from_json(output_filename, data_file, fourier_file):
     fourier_fn = get_fourier_fn(fourier)
 
     for datapoint in data['data']:
-        datapoint['fourier_vegamag'] = fourier_fn(datapoint['lon'])
+        fourier_vegamag = fourier_fn(datapoint['lon'])
+
+        # add deltas for each vegamag found
+        vegamag_keys = [k for k in datapoint.keys() if 'vegamag' in k]
+        for key in vegamag_keys:
+            datapoint[f"{key}_delta"] = fourier_vegamag - datapoint[key]
+
+        datapoint['fourier_vegamag'] = fourier_vegamag
+
 
     with open(output_filename, 'w') as f:
         json.dump(data, f, indent=2) # indent for readable json file
+
 
 # outer function which returns a fourier function
 def get_fourier_fn(data, x_range=(0,360)):

@@ -26,6 +26,9 @@ import pandas as pd
 import utils
 
 def merge(*input_filenames, output_filename):
+    # print(input_filenames)
+    # exit()
+
     input_data = []
     for input_filename in input_filenames:
         with open(input_filename, 'r') as f:
@@ -80,6 +83,7 @@ def merge(*input_filenames, output_filename):
     output_dataframe = input_data[0]['data']
     # join output_dataframe with each dataframe in list
     for data in input_data:
+        print({k:v for k,v in data.items() if k != 'data'})
         suffix = f"_{data['bandpass_name']}"
         output_dataframe = output_dataframe.join(
             data['data'], 

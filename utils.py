@@ -95,6 +95,9 @@ def get_hd_observations(*filter_names):
     output_dict = {
         'obs_to_target': 1,
         'sun_to_target': 1,
+        'lat': -1,
+        'lon': -1,
+        'met': 0,
     }
 
     filter_map = {
