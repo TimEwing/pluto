@@ -13,6 +13,7 @@ sine coefficient.
 import argparse
 import json
 import math
+import os
 # third party imports
 import numpy as np
 # custom module imports
@@ -37,10 +38,15 @@ def fourier_from_json(output_filename, data_file, fourier_file):
         # add deltas for each vegamag found
         vegamag_keys = [k for k in datapoint.keys() if 'vegamag' in k]
         for key in vegamag_keys:
-            datapoint[f"{key}_delta"] = fourier_vegamag - datapoint[key]
+            datapoint[f"{key}_delta"] = datapoint[key] - fourier_vegamag
 
         datapoint['fourier_vegamag'] = fourier_vegamag
 
+    # add some metadata
+    data['fourier_file'] = os.path.basename(fourier_file)
+
+    # Ensure that the 'data' entry is last in the json file for readability
+    data['data'] = data.pop('data')
 
     with open(output_filename, 'w') as f:
         json.dump(data, f, indent=2) # indent for readable json file

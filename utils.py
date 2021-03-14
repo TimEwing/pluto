@@ -160,6 +160,7 @@ def get_nh_observations(
         'sun_to_target': save['targ_sun'],
         'lon': save[f'{target}_lon'],
         'lat': save[f'{target}_lat'],
+        'phase': save[f'phase_{target}'],
         'met': save['met'].tolist(), # tolist casts int32s to ints for json
     }
 
