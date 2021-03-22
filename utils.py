@@ -84,11 +84,11 @@ def write_to_output(name, data):
             out.write(f"{name},{','.join(data)}\n")
 
 
-def get_observations(target, *filter_names):
+def get_observations(target, *filter_names, **kwargs):
     if target == 'hd':
-        return get_hd_observations(*filter_names)
+        return get_hd_observations(*filter_names, **kwargs)
     if target == 'charon' or target == 'pluto':
-        return get_nh_observations(target, *filter_names)
+        return get_nh_observations(target, *filter_names, **kwargs)
 
 def get_hd_observations(*filter_names):
 
@@ -131,7 +131,6 @@ def get_hd_observations(*filter_names):
         side = 1
 
         output_dict.update({
-            f'{filter_name}_counts': data_map[filter_str],
             f'{filter_name}_calib_flux': flux * NH_AF[filter_name][side],
             f'{filter_name}_pivot_wavelength': NH_PIVOT_WAVELENGTH[filter_name],
         })
@@ -140,7 +139,8 @@ def get_hd_observations(*filter_names):
 
 def get_nh_observations(
         target, *filter_names, 
-        file=NH_OBSERVATION_FILE,):
+        file=NH_OBSERVATION_FILE, 
+        **kwargs):
     save = readsav(file)
 
     if target == 'pluto':
@@ -162,6 +162,7 @@ def get_nh_observations(
         'lat': save[f'{target}_lat'],
         'phase': save[f'phase_{target}'],
         'met': save['met'].tolist(), # tolist casts int32s to ints for json
+        'side': save['side'].tolist(),
     }
 
     for filter_name in filter_names:
@@ -171,10 +172,35 @@ def get_nh_observations(
         adjustment_factors = np.array([NH_AF[filter_name][side] for side in save['side']])
 
         output_dict.update({
-            f'{filter_name}_counts': save[f'{prefix}{filter_str}_counts'] * adjustment_factors,
-            f'{filter_name}_calib_flux': save[f'calib_{prefix}{filter_str}_flux'] * adjustment_factors,
+            f'{filter_name}_calib_flux': np.array(save[f'calib_{prefix}{filter_str}_flux']),
             f'{filter_name}_pivot_wavelength': [NH_PIVOT_WAVELENGTH[filter_name]] * expected_length,
         })
+
+        # The .idlsave doesn't have pluto calib errs, so we have to compute them.
+        if target == 'pluto':
+            counts = np.array(save[f"{filter_str}_counts_err"])
+            exptime = np.array(save[f"{filter_str}_exptime"])
+            # p values come as bytes, so we need to decode them before casting to a float
+            p_pluto = save[f'P{target.upper()}_{filter_str.upper()}'] # get value
+            p_pluto = float(p_pluto.decode()) # cast to float
+            calib_flux_err = counts/(exptime*p_pluto)
+        else:
+            # if the target is charon, we have it easy. Just grab the errors.
+            calib_flux_err = np.array(save[f'calib_{prefix}{filter_str}_flux_err'])
+
+        # add errors to output dict
+        output_dict[f'{filter_name}_calib_flux_err'] = calib_flux_err
+
+        # If the errorbar is set to "upper" or "lower", add/sub the error to the flux
+        errorbar = kwargs.get('errorbar', None)
+        if errorbar == 'upper':
+            output_dict[f'{filter_name}_calib_flux'] += output_dict[f'{filter_name}_calib_flux_err']
+        elif errorbar == 'lower':
+            output_dict[f'{filter_name}_calib_flux'] -= output_dict[f'{filter_name}_calib_flux_err']
+
+        # Adjust flux by "Adjustment Factor" from Howett et al. 2017
+        output_dict[f'{filter_name}_calib_flux'] *= adjustment_factors
+
 
     # Return the transpose of the output_dict, i.e. a list of observations
     return transpose_dict(output_dict, output_dict.keys())

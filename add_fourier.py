@@ -20,17 +20,11 @@ import numpy as np
 import utils
 
 
-def fourier_from_json(output_filename, data_file, fourier_file):
+def add_fourier(output_filename, data_file, fourier_file):
     with open(data_file, 'r') as f:
         data = json.load(f)
 
-    fourier = np.genfromtxt(
-        fourier_file, 
-        delimiter=',', 
-        names=True
-    )
-    fourier = [[n, an, bn] for n, an, asn, bn, bsn in fourier]
-    fourier_fn = get_fourier_fn(fourier)
+    fourier_fn = get_fourier_fn(fourier_file)
 
     for datapoint in data['data']:
         fourier_vegamag = fourier_fn(datapoint['lon'])
@@ -53,13 +47,17 @@ def fourier_from_json(output_filename, data_file, fourier_file):
 
 
 # outer function which returns a fourier function
-def get_fourier_fn(data, x_range=(0,360)):
+def get_fourier_fn(fourier_file, x_range=(0,360)):
+    with open(fourier_file, 'r') as f:
+        data = json.load(f)
+    fourier_coefs = [[n, an, bn] for n, an, asn, bn, bsn in data['data']]
     # inner function that gets returned
     def fourier_fn(x):
         y = 0
-        for n, an, bn in data:
+        for n, an, bn in fourier_coefs:
             y = y + math.cos(x_range[0] + 2.0*math.pi/x_range[1] * x * n) * an
             y = y + math.sin(x_range[0] + 2.0*math.pi/x_range[1] * x * n) * bn
+        y -= data['offset']
         return y
 
     return fourier_fn
@@ -87,7 +85,7 @@ if __name__ == '__main__':
     )
 
     args = parser.parse_args()
-    fourier_from_json(
+    add_fourier(
         output_filename=args.output,
         data_file=args.data,
         fourier_file=args.fourier,

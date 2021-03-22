@@ -51,6 +51,7 @@ def main(args):
 def run_gather_data(args):
     target = args.target
     input_bandpass_names = args.input_bandpass_names
+    errorbar = args.errorbar
 
     # We're running gather_data concurrently because I need practice and it 
     # isn't really that much harder
@@ -60,7 +61,7 @@ def run_gather_data(args):
         output_filename = f"{args.JOB_STR}.{args.JOB_ID}.raw.json"
         args.JOB_ID += 1
         commands.append(f"python gather_data.py {target} {input_bandpass_name}\
-            --output {output_filename}")
+            --output {output_filename} --errorbar {errorbar}")
         output_filenames.append(output_filename)
 
     # start subprocesses
@@ -175,6 +176,12 @@ if __name__ == '__main__':
     parser.add_argument(
         "output", 
         help="HST_F435W, JOHNSON_B, etc",
+    )
+    parser.add_argument(
+        "--errorbar", 
+        help="output file name",
+        choices=["upper", "lower", "none"],
+        default="none",
     )
     parser.add_argument(
         "--fourier",

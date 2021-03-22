@@ -10,15 +10,16 @@ from datetime import datetime
 # custom module imports
 import utils
 
-def gather_data(output_filename, target, bandpass_name):
+def gather_data(output_filename, target, bandpass_name, errorbar=None):
     data = {
         'target': target,
         'bandpass_name': bandpass_name,
         'pivot_wavelength': utils.NH_PIVOT_WAVELENGTH[bandpass_name],
+        'errorbar': str(errorbar).lower(),
         'data': []
     }
 
-    observations = utils.get_observations(target, bandpass_name)
+    observations = utils.get_observations(target, bandpass_name, errorbar=errorbar)
 
     for observation in observations:
         # strip "NH_RED" from key names
@@ -60,6 +61,12 @@ if __name__ == '__main__':
         help="NH_RED, NH_BLUE, etc",
     )
     parser.add_argument(
+        "--errorbar", 
+        help="output file name",
+        choices=["upper", "lower", "none"],
+        default="none",
+    )
+    parser.add_argument(
         "--output", 
         help="output file name",
         default=None,
@@ -67,9 +74,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # change errorbar "none" to Nonetype
+    args.errorbar = None if args.errorbar == "none" else args.errorbar
+
     gather_data(
         output_filename=args.output,
         target=args.target,
         bandpass_name=args.filter,
+        errorbar=args.errorbar,
     )
 
