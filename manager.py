@@ -4,12 +4,14 @@ an observation using New Horizons (NH) to the filterset on Hubble Space
 Telescope (HST). 
 
 The following scripts are run in this order:
-
-    gather_data.py      # runs for each input filter
-    single_convert.py   # runs for each input filter
-    merge.py            # runs once
-    multi_convert.py    # runs once
-    add_fourier.py      # runs once
+    for each errorbar (meaning 'upper'/'lower'/'none'):
+        gather_data.py      # runs for each input filter
+        single_convert.py   # runs for each input filter
+        merge.py            # runs once per errorbar, merge by input filter
+        multi_convert.py    # runs once per errorbar
+    merge.py        # runs once, merge by errorbar
+    add_fourier.py  # runs once
+    fit_fourier.py  # runs once
 """
 
 # stdlib imports
@@ -19,33 +21,57 @@ from datetime import datetime
 import os
 
 
-def main(args):
-    intermediate_product_filenames = []
+def manager(args):
+    final_file, intermediate_product_filenames = run_all(args)
 
-    gather_files = run_gather_data(args)
-    intermediate_product_filenames += gather_files
-
-    single_files = run_single_convert(gather_files, args)
-    intermediate_product_filenames += single_files
-
-    merge_file = run_merge(single_files, args)
-    intermediate_product_filenames.append(merge_file)
-
-    multi_file = run_multi_convert(merge_file, args)
-
-    if args.fourier:
-        # if running fourier, multi_file is no longer the final file
-        intermediate_product_filenames.append(multi_file)
-        fourier_file = run_add_fourier(multi_file, args.fourier, args)
-        # rename final file to output_filename
-        os.rename(fourier_file, args.output_filename)
-    else:
-        # rename final file to output_filename
-        os.rename(multi_file, args.output_filename)
+    os.rename(final_file, args.output_filename)
 
     if not args.intermediate_products:
         for filename in intermediate_product_filenames:
             os.remove(filename)
+
+
+def run_all(args):
+    intermediate_product_filenames = []
+
+    error_files = []
+    for errorbar in ['upper', 'lower', 'none']:
+        args.errorbar = errorbar
+        current_files = run_gather_data(args)
+        intermediate_product_filenames += current_files
+
+        current_files = run_single_convert(current_files, args)
+        intermediate_product_filenames += current_files
+
+        current_files = run_merge_bandpass(current_files, args)
+        intermediate_product_filenames += current_files
+
+        current_files = run_multi_convert(current_files, args)
+        intermediate_product_filenames += current_files
+        error_files += current_files
+
+    current_files = run_merge_errorbars(error_files, args)
+    intermediate_product_filenames += current_files
+
+    if args.fourier:
+        current_files = run_add_fourier(current_files, args.fourier, args)
+        intermediate_product_filenames += current_files
+
+    if not args.nofit:
+        # if fitting, we need to clean before to get the sigmas
+        current_files = run_clean(current_files, args)
+        intermediate_product_filenames += current_files
+
+        current_files = run_fit_fourier(current_files, args)
+        intermediate_product_filenames += current_files
+
+    current_files = run_clean(current_files, args)
+    intermediate_product_filenames += current_files
+    
+    # Remove final file from the intermediate product list and rename it
+    final_file, = current_files
+    intermediate_product_filenames.remove(final_file)
+    return final_file, intermediate_product_filenames
 
 
 def run_gather_data(args):
@@ -53,8 +79,8 @@ def run_gather_data(args):
     input_bandpass_names = args.input_bandpass_names
     errorbar = args.errorbar
 
-    # We're running gather_data concurrently because I need practice and it 
-    # isn't really that much harder
+    # We're running concurrently because I need practice and it isn't really 
+    # that much harder
     commands = []
     output_filenames = []
     for input_bandpass_name in input_bandpass_names:
@@ -107,11 +133,11 @@ def run_single_convert(filenames, args):
     return output_filenames
 
 
-def run_merge(filenames, args):
-    output_filename = f"{args.JOB_STR}.{args.JOB_ID}.mrg.json"
+def run_merge_bandpass(filenames, args):
+    output_filename = f"{args.JOB_STR}.{args.JOB_ID}.mbp.json"
     args.JOB_ID += 1
-    command = f"python merge.py {' '.join(filenames)} --output \
-        {output_filename}"
+    command = f"python merge.py {' '.join(filenames)} --key bandpass_name \
+        --output {output_filename}"
 
     # start subprocess
     proc = Popen(command, shell=True, stderr=STDOUT)
@@ -121,10 +147,29 @@ def run_merge(filenames, args):
     if args.verbose:
         print(proc.stdout.read())
 
-    return output_filename
+    return [output_filename]
 
 
-def run_multi_convert(filename, args):
+def run_merge_errorbars(filenames, args):
+    output_filename = f"{args.JOB_STR}.{args.JOB_ID}.mer.json"
+    args.JOB_ID += 1
+    command = f"python merge.py {' '.join(filenames)} --key errorbar \
+        --output {output_filename}"
+
+    # start subprocess
+    proc = Popen(command, shell=True, stderr=STDOUT)
+
+    # wait for process to finish
+    proc.wait()
+    if args.verbose:
+        print(proc.stdout.read())
+
+    return [output_filename]
+
+
+def run_multi_convert(filenames, args):
+    filename, = filenames
+
     output_filename = f"{args.JOB_STR}.{args.JOB_ID}.mlt.json"
     args.JOB_ID += 1
     command = f"python multi_convert.py {filename} --output {output_filename}"
@@ -137,10 +182,12 @@ def run_multi_convert(filename, args):
     if args.verbose:
         print(proc.stdout.read())
 
-    return output_filename
+    return [output_filename]
 
 
-def run_add_fourier(filename, fourier, args):
+def run_add_fourier(filenames, fourier, args):
+    filename, = filenames
+
     output_filename = f"{args.JOB_STR}.{args.JOB_ID}.for.json"
     args.JOB_ID += 1
     command = f"python add_fourier.py {filename} {fourier} --output \
@@ -154,7 +201,47 @@ def run_add_fourier(filename, fourier, args):
     if args.verbose:
         print(proc.stdout.read())
 
-    return output_filename
+    return [output_filename]
+
+
+def run_fit_fourier(filenames, args):
+    filename, = filenames
+
+    output_filename = f"{args.JOB_STR}.{args.JOB_ID}.fit.json"
+    args.JOB_ID += 1
+
+    n = 5 if args.target == 'pluto' else 3
+
+    command = f"python fit_fourier.py {filename} {n} --output {output_filename}"
+
+    # start subprocess
+    proc = Popen(command, shell=True, stderr=STDOUT)
+
+    # wait for process to finish
+    proc.wait()
+    if args.verbose:
+        print(proc.stdout.read())
+
+    return [output_filename]
+
+
+def run_clean(filenames, args):
+    filename, = filenames
+
+    output_filename = f"{args.JOB_STR}.{args.JOB_ID}.cln.json"
+    args.JOB_ID += 1
+
+    command = f"python clean.py {filename} --output {output_filename}"
+
+    # start subprocess
+    proc = Popen(command, shell=True, stderr=STDOUT)
+
+    # wait for process to finish
+    proc.wait()
+    if args.verbose:
+        print(proc.stdout.read())
+
+    return [output_filename]
 
 
 if __name__ == '__main__':
@@ -178,14 +265,13 @@ if __name__ == '__main__':
         help="HST_F435W, JOHNSON_B, etc",
     )
     parser.add_argument(
-        "--errorbar", 
-        help="output file name",
-        choices=["upper", "lower", "none"],
-        default="none",
+        "--nofit", 
+        help="don't add a fourier fit to the end product",
+        action='store_true',
     )
     parser.add_argument(
         "--fourier",
-        help="optional fourier file",
+        help="fourier file for Buie's fourier fit",
     )
     parser.add_argument(
         "--o", 
@@ -215,4 +301,4 @@ if __name__ == '__main__':
     args.JOB_STR = f"{timestamp}_{args.target}"
     args.JOB_ID = 0
 
-    main(args)
+    manager(args)

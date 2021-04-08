@@ -41,6 +41,10 @@ COLORMAP = {
     'NH_PAN_2': 'purple',
     'HST_F555W': 'tomato',
     'HST_F435W': 'cyan',
+    'pluto': 'red',
+    'charon': 'blue',
+    'hd': 'green',
+    'vega': 'black',
 }
 LABELMAP = {
     'pluto': 'Pluto',
@@ -319,14 +323,14 @@ def get_nh_bandpass_data(file):
         return wavelengths, throughputs, header
 
 def get_spectrum(target):
-    if target == 'charon':
-        return get_charon_spectrum()
+    if target == 'vega':
+        return S.Vega
     elif target == 'pluto':
         return get_pluto_spectrum()
+    elif target == 'charon':
+        return get_charon_spectrum()
     elif target == 'hd':
         return get_hd_spectrum()
-    elif target == 'vega':
-        return S.Vega
     raise ValueError(f"Unknown spectrum name: {target}")
 
 def get_charon_spectrum():

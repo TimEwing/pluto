@@ -1,9 +1,9 @@
 {
   "target": "pluto",
   "bandpass": "HST_F555W",
-  "offset": 0.0398,
-  "columns": ["n","an","σa","bn","σb"],
-  "data": [
+  "fourier_offset": 0.0398,
+  "fourier_columns": ["n","an","σa","bn","σb"],
+  "fourier_coefs": [
     [0,15.3298,0.0008,0,0],
     [1,0.0338,0.0011,0.0969,0.0013],
     [2,-0.0373,0.0012,-0.0247,0.0013],

@@ -6,7 +6,7 @@ fourier_file.
 The fourier file should have 5 columns and a header row, like
     n,an,σa,bn,σb
 where n is the fourier series n, an is the cosine coefficient, and bn is the 
-sine coefficient. 
+sin coefficient. 
 """
 
 # stdlib imports
@@ -16,6 +16,7 @@ import math
 import os
 # third party imports
 import numpy as np
+import pandas as pd
 # custom module imports
 import utils
 
@@ -32,7 +33,7 @@ def add_fourier(output_filename, data_file, fourier_file):
         # add deltas for each vegamag found
         vegamag_keys = [k for k in datapoint.keys() if 'vegamag' in k]
         for key in vegamag_keys:
-            datapoint[f"{key}_delta"] = datapoint[key] - fourier_vegamag
+            datapoint[f"{key}_buie_delta"] = datapoint[key] - fourier_vegamag
 
         datapoint['fourier_vegamag'] = fourier_vegamag
 
@@ -50,14 +51,20 @@ def add_fourier(output_filename, data_file, fourier_file):
 def get_fourier_fn(fourier_file, x_range=(0,360)):
     with open(fourier_file, 'r') as f:
         data = json.load(f)
-    fourier_coefs = [[n, an, bn] for n, an, asn, bn, bsn in data['data']]
+    # load df
+    df = pd.DataFrame(data['fourier_coefs'], columns=data['fourier_columns'])
+    # select columns
+    df = df[['n', 'an', 'bn']]
+    # convert to list
+    fourier_coefs = df.values.tolist()
+
     # inner function that gets returned
     def fourier_fn(x):
-        y = 0
+        y = np.zeros(np.shape(x))
         for n, an, bn in fourier_coefs:
-            y = y + math.cos(x_range[0] + 2.0*math.pi/x_range[1] * x * n) * an
-            y = y + math.sin(x_range[0] + 2.0*math.pi/x_range[1] * x * n) * bn
-        y -= data['offset']
+            y = y + np.cos(x_range[0] + 2.0*np.pi/x_range[1] * x * n) * an
+            y = y + np.sin(x_range[0] + 2.0*np.pi/x_range[1] * x * n) * bn
+        y += data['fourier_offset']
         return y
 
     return fourier_fn

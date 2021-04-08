@@ -6,12 +6,12 @@ There are 3 different types of field that will be handled:
 
 1. 'data' entry
     Datapoints will be merged by the 'met' field. Fields which match across all
-    datasets will just be added like 'obs_to_target:value'; fields which do not 
-    will be added like 'flux_NH_BLUE:value'.
+    datasets will be unchanged; otherwise, they are added in the format 
+    {data_key}_{merge_key}: value
 
 2. 'metadata' (i.e. not the 'data' field) which is unique per dataset
-    New fields will be added in the format bandpass_key, 
-    e.g. 'NH_BLUE_pivot_wavelength'.
+    New fields will be added in the format {merge_key}_{metadata_key}: value, 
+    e.g. 'NH_BLUE_pivot_wavelength': 12345.67.
 
 3. 'metadata' which matches for all datasets
     No change; output will be like 'target:value'
@@ -25,7 +25,7 @@ import pandas as pd
 # custom module imports
 import utils
 
-def merge(*input_filenames, output_filename):
+def merge(*input_filenames, output_filename, merge_key):
 
     input_data = []
     for input_filename in input_filenames:
@@ -66,7 +66,7 @@ def merge(*input_filenames, output_filename):
     ]
     for key in nonunique_keys:
         for data in input_data:
-            new_key = f"{key}_{data['bandpass_name']}"
+            new_key = f"{key}_{data[merge_key]}"
             output_data[new_key] = data[key]
         output_data.pop(key)
     # act on the rest of the keys (where the set has exactly 1 value in it)
@@ -81,7 +81,7 @@ def merge(*input_filenames, output_filename):
     output_dataframe = input_data[0]['data']
     # join output_dataframe with each dataframe in list
     for data in input_data:
-        suffix = f"_{data['bandpass_name']}"
+        suffix = f"_{data[merge_key]}"
         output_dataframe = output_dataframe.join(
             data['data'], 
             lsuffix='', 
@@ -89,7 +89,7 @@ def merge(*input_filenames, output_filename):
         )
 
     ## Remove columns in 'data' with duplicate data
-    suffixes = [f"_{d['bandpass_name']}" for d in input_data]
+    suffixes = [f"_{d[merge_key]}" for d in input_data]
     for column in columns:
         all_match = all([
             output_dataframe[column].equals(output_dataframe[column+suffix])
@@ -126,6 +126,10 @@ if __name__ == '__main__':
         help="filenames containing input data",
     )
     parser.add_argument(
+        "--key", 
+        help="primary key used to merge files",
+    )
+    parser.add_argument(
         "--output", 
         help="output file name",
         default="output.json",
@@ -135,5 +139,6 @@ if __name__ == '__main__':
     merge(
         *args.inputs,
         output_filename=args.output,
+        merge_key=args.key
     )
 
