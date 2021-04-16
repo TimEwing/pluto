@@ -119,8 +119,8 @@ if __name__ == '__main__':
     parser.add_argument(
         "--error",
         choices=["average", "select", "none"],
-        default='average',
-        help="name of the field to fit data to",
+        default='average'
+,        help="name of the field to fit data to",
     )
     parser.add_argument(
         "--output", 

@@ -7,24 +7,43 @@ import numpy as np
 from astropy.io import fits
 from scipy.io.idl import readsav
 # pysynphot
-os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") # set pysyn env if not set
-import pysynphot as S # Importing it as S bad style for python, but used by the docs
+# set pysyn env if not set
+os.environ["PYSYN_CDBS"] = os.environ.get("PYSYN_CDBS", "data/pysyn/") 
+# Importing pysynphot as S bad style for python, but used by the docs
+import pysynphot as S 
 
-# Set telescope aperture; otherwise, default for Hubble is used
-S.setref(area=176.7) # cm^2; using 75mm radius aperture from DOI: 10.1117/12.617901
 
 # Constants
-REWRITE_DATA_FILE = False # Set to true to make plots write to output.csv
-
-NH_FILTER_DIR = 'data/nh_filters'
-HST_FILTER_DIR = 'data/hst_filters'
-CHARON_SPECTRUM = 'data/spectra/charon_spectrum.dat'
-PLUTO_SPECTRUM = 'data/spectra/pluto_spectrum.dat'
-HD_SPECTRUM = 'data/hd205905_spectrum_withheader.txt'
-OUTPUT_DATA_FILE = 'data/output.csv'
+NH_FILTER_DIR = os.environ.get(
+    'NH_FILTER_DIR', 
+    'data/nh_filters'
+)
+HST_FILTER_DIR = os.environ.get(
+    'HST_FILTER_DIR', 
+    'data/hst_filters'
+)
+CHARON_SPECTRUM = os.environ.get(
+    'CHARON_SPECTRUM', 
+    'data/spectra/charon_spectrum.dat'
+)
+PLUTO_SPECTRUM = os.environ.get(
+    'PLUTO_SPECTRUM', 
+    'data/spectra/pluto_spectrum.dat'
+)
+HD_SPECTRUM = os.environ.get(
+    'HD_SPECTRUM', 
+    'data/hd205905_spectrum_withheader.txt'
+)
+SOLAR_SPECTRUM = os.environ.get(
+    'SOLAR_SPECTRUM', 
+    'data/spectra/stis_solar.dat'
+)
 # vegafile not used since pysynphot comes with a vega spectrum
 # VEGAFILE = 'data/vega_spectrum.fits'
-NH_OBSERVATION_FILE = 'data/nh_obs.idlsave'
+NH_OBSERVATION_FILE = os.environ.get(
+    'NH_OBSERVATION_FILE', 
+    'data/nh_obs.idlsave'
+)
 
 # For plots
 COLORMAP = {
@@ -82,17 +101,12 @@ NH_AF = {
 }
 
 
-def write_to_output(name, data):
-    if REWRITE_DATA_FILE:
-        with open(OUTPUT_DATA_FILE, 'a') as out:
-            out.write(f"{name},{','.join(data)}\n")
-
-
 def get_observations(target, *filter_names, **kwargs):
     if target == 'hd':
         return get_hd_observations(*filter_names, **kwargs)
     if target == 'charon' or target == 'pluto':
         return get_nh_observations(target, *filter_names, **kwargs)
+
 
 def get_hd_observations(*filter_names):
 
@@ -140,6 +154,7 @@ def get_hd_observations(*filter_names):
         })
     # Return output as a length-1 list so it works with other code
     return [output_dict]
+
 
 def get_nh_observations(
         target, *filter_names, 
@@ -322,6 +337,7 @@ def get_nh_bandpass_data(file):
 
         return wavelengths, throughputs, header
 
+
 def get_spectrum(target):
     if target == 'vega':
         return S.Vega
@@ -332,6 +348,7 @@ def get_spectrum(target):
     elif target == 'hd':
         return get_hd_spectrum()
     raise ValueError(f"Unknown spectrum name: {target}")
+
 
 def get_charon_spectrum():
     wavelengths, fluxes = get_charon_spectrum_data()
@@ -406,3 +423,31 @@ def get_hd_spectrum_data(filename=HD_SPECTRUM):
         data = np.array([[float(x), float(y)] for x,y in reader])
         wavelengths, fluxes = data.transpose()
         return wavelengths, fluxes
+
+
+def get_solar_spectrum():
+    wavelengths, fluxes = get_solar_spectrum_data()
+    spectrum = S.ArraySpectrum(
+        wave=wavelengths,
+        flux=fluxes,
+        name='Sun',
+        waveunits='Angstrom',
+        fluxunits='Flam'
+    )
+    return spectrum
+
+
+def get_solar_spectrum_data(filename=HD_SPECTRUM):
+    with open(filename) as file:
+        reader = csv.reader(
+            file, 
+            delimiter=' ',
+            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
+        )
+        next(reader) # Skip first line (header)
+        
+        # Read off lines, casting everything to floats
+        data = np.array([[float(x), float(y)] for x,y in reader])
+        wavelengths, fluxes = data.transpose()
+        return wavelengths, fluxes
+
