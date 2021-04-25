@@ -1,0 +1,83 @@
+PDS_VERSION_ID               = PDS3                                           
+                                                                              
+                                                                              
+RECORD_TYPE                  = FIXED_LENGTH                                   
+RECORD_BYTES                 = 28                                             
+FILE_RECORDS                 = 1245                                           
+                                                                              
+                                                                              
+                                                                              
+^TABLE = ( "PHOLUS_SPECTRUM.TAB", 1)                                          
+                                                                              
+                                                                              
+                                                                              
+MISSION_NAME                 = "NEW HORIZONS"                                 
+DATA_SET_ID                  = "NH-X-MVIC-3-KEMCRUISE1-V1.0"                  
+PRODUCT_ID                   = "                                              
+PHOLUS_SPECTRUM                                                               
+"                                                                             
+PRODUCER_INSTITUTION_NAME    = "SOUTHWEST RESEARCH INSTITUTE"                 
+PRODUCT_CREATION_TIME        = 2018-06-01T00:00:00                            
+                                                                              
+INSTRUMENT_NAME              = "                                              
+CCD IMAGER                                                                    
+"                                                                             
+INSTRUMENT_ID                = "                                              
+CCD                                                                           
+"                                                                             
+INSTRUMENT_HOST_NAME         = "NEW HORIZONS"                                 
+                                                                              
+OBJECT                       = TABLE                                          
+  NAME                       = "                                              
+PHOLUS_SPECTRUM                                                               
+"                                                                             
+  INTERCHANGE_FORMAT         = ASCII                                          
+  ROWS                       = 1245                                           
+  COLUMNS                    = 2                                              
+  ROW_BYTES                  = 28                                             
+  DESCRIPTION                = "                                              
+Spectrum of specific intensity of target                                      
+                                                                              
+  PHOLUS                                                                      
+                                                                              
+This is the result of combining an albedo model spectrum for the target       
+and the solar range to the target with the solar flux spectrum (i.e.          
+STIS_SOLAR).                                                                  
+                                                                              
+The pedigree of the albedo model spectrum:                                    
+                                                                              
+  This is the Cruikshank et al. 1998 model, except using Will Grundy's        
+  Hapke code instead of Ted Roush's, so it looks slightly different. It       
+  should be noted that Pholus may actually be a bit brighter than this        
+  spectrum(the absolute albedo is still somewhat uncertain, and this is       
+  on the low side of the plausible range). There are no data on the           
+  albedo of Pholus below 0.44 microns, so the part from 0.3 to 0.44 is        
+  very poorly constrained.                                                    
+                                                                              
+  "                                                                           
+                                                                              
+  OBJECT                     = COLUMN                                         
+    NAME                     = "                                              
+WAVELENGTH                                                                    
+"                                                                             
+    START_BYTE               = 1                                              
+    BYTES                    = 13                                             
+    COLUMN_NUMBER            = 1                                              
+    DATA_TYPE                = ASCII_REAL                                     
+    FORMAT                   = "F13.7"                                        
+    UNIT                     = "micron"                                       
+  END_OBJECT                 = COLUMN                                         
+                                                                              
+  OBJECT                     = COLUMN                                         
+    NAME                     = "                                              
+PHOLUS SPECIFIC INTENSITY                                                     
+"                                                                             
+    START_BYTE               = 15                                             
+    BYTES                    = 12                                             
+    COLUMN_NUMBER            = 2                                              
+    DATA_TYPE                = ASCII_REAL                                     
+    FORMAT                   = "F12.7"                                        
+    UNIT                     = "W m**-2 micron**-1 sr**-1"                    
+  END_OBJECT                 = COLUMN                                         
+END_OBJECT                   = TABLE                                          
+END                                                                           

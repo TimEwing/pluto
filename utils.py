@@ -38,6 +38,10 @@ SOLAR_SPECTRUM = os.environ.get(
     'SOLAR_SPECTRUM', 
     'data/spectra/stis_solar.dat'
 )
+PHOLUS_SPECTRUM = os.environ.get(
+    'PHOLUS_SPECTRUM', 
+    'data/spectra/pholus_spectrum.dat'
+)
 # vegafile not used since pysynphot comes with a vega spectrum
 # VEGAFILE = 'data/vega_spectrum.fits'
 NH_OBSERVATION_FILE = os.environ.get(
@@ -64,12 +68,16 @@ COLORMAP = {
     'charon': 'blue',
     'hd': 'green',
     'vega': 'black',
+    'solar': 'darkgreen',
+    'pholus': 'darkorange',
 }
 LABELMAP = {
     'pluto': 'Pluto',
     'charon': 'Charon',
     'hd': 'HD205905',
     'vega': 'Vega',
+    'solar': 'Solar',
+    'pholus': 'Pholus',
     'JOHNSON_U': 'Johnson U',
     'JOHNSON_B': 'Johnson B',
     'JOHNSON_V': 'Johnson V',
@@ -342,112 +350,33 @@ def get_spectrum(target):
     if target == 'vega':
         return S.Vega
     elif target == 'pluto':
-        return get_pluto_spectrum()
+        spectrum_file = PLUTO_SPECTRUM
     elif target == 'charon':
-        return get_charon_spectrum()
+        spectrum_file = CHARON_SPECTRUM
     elif target == 'hd':
-        return get_hd_spectrum()
-    raise ValueError(f"Unknown spectrum name: {target}")
+        spectrum_file = HD_SPECTRUM
+    elif target == 'solar':
+        spectrum_file = SOLAR_SPECTRUM
+    elif target == 'pholus':
+        spectrum_file = PHOLUS_SPECTRUM
+    else:
+        raise ValueError(f"Unknown spectrum name: {target}")
 
 
-def get_charon_spectrum():
-    wavelengths, fluxes = get_charon_spectrum_data()
+    with open(spectrum_file) as file:
+        reader = csv.reader(
+            file, 
+            delimiter=' ',
+            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
+        )
+        # Read off lines, casting everything to floats
+        data = np.array([[float(x), float(y)] for x,y in reader])
+    
+    wavelengths, fluxes = data.transpose()
     spectrum = S.ArraySpectrum(
         wave=wavelengths,
         flux=fluxes,
-        name='Charon',
+        name=LABELMAP[target],
         waveunits='micron',
     )
     return spectrum
-
-
-def get_charon_spectrum_data():
-    with open(CHARON_SPECTRUM) as file:
-        reader = csv.reader(
-            file, 
-            delimiter=' ',
-            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
-        )
-        # Read off lines, casting everything to floats
-        data = np.array([[float(x), float(y)] for x,y in reader])
-        wavelengths, fluxes = data.transpose()
-        return wavelengths, fluxes
-
-
-def get_pluto_spectrum():
-    wavelengths, fluxes = get_pluto_spectrum_data()
-    spectrum = S.ArraySpectrum(
-        wave=wavelengths,
-        flux=fluxes,
-        name='Pluto',
-        waveunits='micron',
-    )
-    return spectrum
-
-
-def get_pluto_spectrum_data():
-    with open(PLUTO_SPECTRUM) as file:
-        reader = csv.reader(
-            file, 
-            delimiter=' ',
-            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
-        )
-        # Read off lines, casting everything to floats
-        data = np.array([[float(x), float(y)] for x,y in reader])
-        wavelengths, fluxes = data.transpose()
-        return wavelengths, fluxes
-
-
-def get_hd_spectrum():
-    wavelengths, fluxes = get_hd_spectrum_data()
-    spectrum = S.ArraySpectrum(
-        wave=wavelengths,
-        flux=fluxes,
-        name='h205905',
-        waveunits='Angstrom',
-        fluxunits='Flam'
-    )
-    return spectrum
-
-
-def get_hd_spectrum_data(filename=HD_SPECTRUM):
-    with open(filename) as file:
-        reader = csv.reader(
-            file, 
-            delimiter=' ',
-            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
-        )
-        next(reader) # Skip first line (header)
-        
-        # Read off lines, casting everything to floats
-        data = np.array([[float(x), float(y)] for x,y in reader])
-        wavelengths, fluxes = data.transpose()
-        return wavelengths, fluxes
-
-
-def get_solar_spectrum():
-    wavelengths, fluxes = get_solar_spectrum_data()
-    spectrum = S.ArraySpectrum(
-        wave=wavelengths,
-        flux=fluxes,
-        name='Sun',
-        waveunits='Angstrom',
-        fluxunits='Flam'
-    )
-    return spectrum
-
-
-def get_solar_spectrum_data(filename=HD_SPECTRUM):
-    with open(filename) as file:
-        reader = csv.reader(
-            file, 
-            delimiter=' ',
-            skipinitialspace=True, # Strip leading whitespace to avoid getting many columns
-        )
-        next(reader) # Skip first line (header)
-        
-        # Read off lines, casting everything to floats
-        data = np.array([[float(x), float(y)] for x,y in reader])
-        wavelengths, fluxes = data.transpose()
-        return wavelengths, fluxes
-

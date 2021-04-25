@@ -1,7 +1,7 @@
 {
   "target": "charon",
   "bandpass": "HST_F435W",
-  "fourier_offset": 999,
+  "fourier_offset": 0,
   "fourier_columns": ["n","an","σa","bn","σb"],
   "fourier_coefs": [
     [0,18.0484,0.0009,0,0],
